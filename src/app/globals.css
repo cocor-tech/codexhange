@@ -1,0 +1,194 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg-base: #0a0a0f;
+    --bg-primary: #0a0a0f;
+    --bg-secondary: #12121a;
+    --text-primary: #f0f0f0;
+    --text-secondary: rgba(240, 240, 240, 0.65);
+    --text-muted: rgba(240, 240, 240, 0.35);
+    --border: rgba(240, 240, 240, 0.08);
+    --hover-overlay: rgba(240, 240, 240, 0.04);
+  }
+
+  .light {
+    --color-bg-base: #f5f0eb;
+    --bg-primary: #faf8f6;
+    --bg-secondary: #f0ece6;
+    --text-primary: #1a1a1a;
+    --text-secondary: rgba(26, 26, 26, 0.6);
+    --text-muted: rgba(26, 26, 26, 0.35);
+    --border: rgba(26, 26, 26, 0.08);
+    --hover-overlay: rgba(26, 26, 26, 0.04);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-bg-base);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+}
+
+@layer components {
+  .glass {
+    border: 1px solid var(--border);
+    background-color: color-mix(in srgb, var(--bg-primary) 94%, transparent);
+    backdrop-filter: blur(12px);
+  }
+
+  .glass-card {
+    border: 1px solid var(--border);
+    background-color: color-mix(in srgb, var(--bg-primary) 94%, transparent);
+    backdrop-filter: blur(12px);
+    border-radius: 0.75rem;
+    padding: 1.25rem;
+    transition: all 0.2s;
+  }
+
+  .glass-card:hover {
+    background-color: color-mix(in srgb, var(--bg-primary) 92%, transparent);
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1px solid transparent;
+    background-color: #d97706;
+    padding: 0.625rem 1.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #fff;
+    transition: all 0.2s;
+    border-radius: 0;
+    border-top-left-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+  }
+
+  .btn-primary:hover {
+    background-color: #f59e0b;
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
+  }
+
+  .btn-primary:active {
+    translate: 0 1px;
+  }
+
+  .btn-primary:disabled {
+    pointer-events: none;
+    opacity: 0.5;
+  }
+
+  .btn-glass {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1px solid var(--border);
+    background-color: var(--hover-overlay);
+    padding: 0.625rem 1.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    backdrop-filter: blur(12px);
+    transition: all 0.2s;
+    border-radius: 0;
+    border-top-left-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+  }
+
+  .btn-glass:hover {
+    background-color: color-mix(in srgb, var(--bg-primary) 85%, transparent);
+    border-color: var(--text-muted);
+  }
+
+  .btn-glass:active {
+    translate: 0 1px;
+  }
+
+  .btn-glass:disabled {
+    pointer-events: none;
+    opacity: 0.5;
+  }
+
+  .btn-white {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0;
+    border-top-left-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+    background-color: var(--text-primary);
+    padding: 0.625rem 1.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-bg-base);
+    transition: all 0.2s;
+  }
+
+  .btn-white:hover {
+    opacity: 0.9;
+  }
+
+  .input-glass {
+    width: 100%;
+    border-radius: 0;
+    border-top-left-radius: 1rem;
+    border-bottom-right-radius: 1rem;
+    border: 1px solid var(--border);
+    background-color: var(--hover-overlay);
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s, background-color 0.2s;
+  }
+
+  .input-glass::placeholder {
+    color: var(--text-muted);
+  }
+
+  .input-glass:focus {
+    border-color: #d97706;
+    background-color: color-mix(in srgb, var(--bg-primary) 92%, transparent);
+  }
+
+  .auth-card {
+    width: 100%;
+    max-width: 24rem;
+    border: 1px solid var(--border);
+    background-color: var(--bg-primary);
+    backdrop-filter: blur(16px);
+    border-radius: 1rem;
+    padding: 2rem;
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.25s ease-out forwards;
+  }
+}
