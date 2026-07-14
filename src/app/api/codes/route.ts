@@ -3,10 +3,10 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/mongoose';
 import Code from '@/lib/models/Code';
-import User from '@/lib/models/User';
-import FuelLedger from '@/lib/models/FuelLedger';
 import { verifyFingerprint } from '@/lib/requireFingerprint';
 import { z } from 'zod';
+
+export const dynamic = 'force-dynamic';
 
 const submitSchema = z.object({
   code: z.string().min(1).max(100),
@@ -17,6 +17,7 @@ const submitSchema = z.object({
   restrictions: z.string().max(200).optional(),
   expiresAt: z.string().optional(),
   link: z.string().url().optional(),
+  affiliateLink: z.string().url().optional(),
   scope: z.enum(['global', 'local']).default('global'),
   country: z.string().max(2).optional(),
 });
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
   }
 
   const codes = await Code.find(filter)
-    .sort({ boosted: -1, boostedUntil: -1, createdAt: -1 })
+    .sort({ createdAt: -1 })
     .lean();
 
   return NextResponse.json({ codes });
@@ -64,15 +65,6 @@ export async function POST(req: NextRequest) {
   const code = await Code.create({
     ...parsed.data,
     submittedBy: session.user.id,
-  });
-
-  await User.findByIdAndUpdate(session.user.id, { $inc: { fuelBalance: 5 } });
-  await FuelLedger.create({
-    userId: session.user.id,
-    amount: 5,
-    type: 'earned',
-    reason: 'submission',
-    reference: code._id.toString(),
   });
 
   return NextResponse.json({ code }, { status: 201 });

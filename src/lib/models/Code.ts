@@ -9,16 +9,13 @@ export interface ICode extends Document {
   restrictions?: string;
   expiresAt?: Date;
   link?: string;
+  affiliateLink?: string;
   scope: 'global' | 'local';
   country?: string;
   submittedBy: mongoose.Types.ObjectId;
   upvotes: number;
   downvotes: number;
   clicks: number;
-  boosted: boolean;
-  boostedUntil?: Date;
-  boostClicksUsed: number;
-  boostClicksLimit: number;
   archived: boolean;
   archivedAt?: Date;
   createdAt: Date;
@@ -41,10 +38,7 @@ const CodeSchema = new Schema<ICode>(
     upvotes: { type: Number, default: 0 },
     downvotes: { type: Number, default: 0 },
     clicks: { type: Number, default: 0 },
-    boosted: { type: Boolean, default: false },
-    boostedUntil: { type: Date },
-    boostClicksUsed: { type: Number, default: 0 },
-    boostClicksLimit: { type: Number, default: 0 },
+    affiliateLink: { type: String },
     archived: { type: Boolean, default: false },
     archivedAt: { type: Date },
   },
@@ -52,6 +46,6 @@ const CodeSchema = new Schema<ICode>(
 );
 
 CodeSchema.index({ brandSlug: 1, scope: 1, country: 1 });
-CodeSchema.index({ brandSlug: 1, archived: 1, boosted: 1 });
+CodeSchema.index({ brandSlug: 1, archived: 1 });
 
 export default mongoose.models.Code || mongoose.model<ICode>('Code', CodeSchema);

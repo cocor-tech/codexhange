@@ -30,7 +30,6 @@ export const authOptions: AuthOptions = {
     async session({ session, user }) {
       if (session.user) {
         (session.user as any).id = user.id;
-        (session.user as any).fuelBalance = (user as any).fuelBalance ?? 0;
         (session.user as any).isAdmin = (user as any).isAdmin ?? false;
       }
       return session;
@@ -38,6 +37,5 @@ export const authOptions: AuthOptions = {
   },
   pages: {
     signIn: '/auth/login',
-    newUser: '/auth/register',
   },
 };

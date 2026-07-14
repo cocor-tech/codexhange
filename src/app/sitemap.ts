@@ -13,15 +13,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${baseUrl}/terms`, lastModified: new Date(), changeFrequency: 'yearly', priority: 0.3 },
   ];
 
-  await connectDB();
-  const brands = await Code.distinct('brandSlug', { archived: false });
+  try {
+    await connectDB();
+    const brands = await Code.distinct('brandSlug', { archived: false });
 
-  const brandPages: MetadataRoute.Sitemap = brands.map((slug) => ({
-    url: `${baseUrl}/brand/${slug}`,
-    lastModified: new Date(),
-    changeFrequency: 'hourly' as const,
-    priority: 0.9,
-  }));
+    const brandPages: MetadataRoute.Sitemap = brands.map((slug) => ({
+      url: `${baseUrl}/brand/${slug}`,
+      lastModified: new Date(),
+      changeFrequency: 'hourly' as const,
+      priority: 0.9,
+    }));
 
-  return [...staticPages, ...brandPages];
+    return [...staticPages, ...brandPages];
+  } catch {
+    return staticPages;
+  }
 }

@@ -54,7 +54,7 @@ export function VoteButtons({ codeId, upvotes, downvotes, onVote }: VoteButtonsP
         disabled={loading || !session}
         className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-green-500/10 disabled:opacity-40"
         style={{ color: upvotes > downvotes ? '#22c55e' : 'var(--text-muted)' }}
-        title={session ? 'Upvote (+10 Fuel)' : 'Sign in to vote'}
+        title={session ? 'Upvote' : 'Sign in to vote'}
       >
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />

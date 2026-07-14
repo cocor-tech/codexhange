@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Terms of Service | CodeXhange',
-  description: 'CodeXhange terms of service. Rules for using the platform, submitting codes, and participating in the Fuel economy.',
+  description: 'CodeXhange terms of service. Rules for using the platform, submitting codes, and using affiliate links.',
 };
 
 export default function TermsPage() {
@@ -16,9 +16,9 @@ export default function TermsPage() {
           <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Use of Service</h2>
           <p>You may browse and copy promo codes freely without an account. Creating an account and contributing codes requires accurate information.</p>
           <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>User Conduct</h2>
-          <p>Do not submit fake or expired codes. Do not manipulate voting through multi-account farming. Violations may result in account suspension and forfeiture of Fuel balance.</p>
-          <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Fuel Economy</h2>
-          <p>Fuel tokens are virtual and have no real-world monetary value. They cannot be bought, sold, or transferred outside the platform. The platform reserves the right to adjust Fuel earning rates and boost costs.</p>
+          <p>Do not submit fake or expired codes. Do not manipulate voting through multi-account farming. Violations may result in account suspension.</p>
+          <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Affiliate Links</h2>
+          <p>Users may submit affiliate links alongside promo codes. CodeXhange is not responsible for the terms, commissions, or outcomes of any affiliate relationships between users and merchants.</p>
           <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Affiliate Links</h2>
           <p>Some outbound links on CodeXhange are affiliate links. We may earn a commission if you make a purchase through these links, at no extra cost to you.</p>
           <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Limitation of Liability</h2>

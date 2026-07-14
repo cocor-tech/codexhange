@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Poppins } from 'next/font/google';
 import { SessionProvider } from '@/lib/SessionProvider';
+import { ToastProvider } from '@/components/ui/Toast';
 import { Navbar } from '@/components/Navbar';
 import Link from 'next/link';
 import './globals.css';
@@ -47,6 +48,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           __html: `(function(){try{var t=localStorage.getItem('codexhange-theme');document.documentElement.className=t||'light'}catch(e){}})()`
         }} />
         <SessionProvider>
+          <ToastProvider>
           <Navbar />
           <div className="flex-1">{children}</div>
           <footer className="border-t py-10 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
@@ -109,6 +111,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </div>
             </div>
           </footer>
+          </ToastProvider>
         </SessionProvider>
       </body>
     </html>

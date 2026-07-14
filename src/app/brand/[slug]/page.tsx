@@ -47,7 +47,7 @@ async function getBrandCodes(slug: string, country?: string) {
     filter.$or = [{ scope: 'global' }, { country: country.toUpperCase() }];
   }
   return Code.find(filter)
-    .sort({ boosted: -1, boostedUntil: -1, createdAt: -1 })
+    .sort({ createdAt: -1 })
     .lean();
 }
 
@@ -172,7 +172,6 @@ export default async function BrandPage({ params, searchParams }: Props) {
                   <article key={code._id.toString()} className="glass-card flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        {code.boosted && <span className="rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider" style={{ backgroundColor: '#d9770620', color: '#f59e0b' }}>Boosted</span>}
                         <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{code.scope === 'global' ? 'Global' : code.country}</span>
                         {code.expiresAt && <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Expires {new Date(code.expiresAt).toLocaleDateString()}</span>}
                       </div>
@@ -187,9 +186,11 @@ export default async function BrandPage({ params, searchParams }: Props) {
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <code className="rounded-lg border px-3 py-1.5 text-sm font-mono font-bold tracking-wide select-all" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>{code.code}</code>
-                      {code.link && (
+                      {code.affiliateLink ? (
+                        <a href={code.affiliateLink} target="_blank" rel="nofollow sponsored noopener noreferrer" className="btn-primary px-4 py-1.5 text-sm whitespace-nowrap">Get Deal</a>
+                      ) : code.link ? (
                         <a href={`/go?url=${encodeURIComponent(code.link)}&ref=${slug}`} target="_blank" rel="nofollow sponsored noopener noreferrer" className="btn-primary px-4 py-1.5 text-sm whitespace-nowrap">Use Code</a>
-                      )}
+                      ) : null}
                     </div>
                     <div className="flex items-center gap-2 sm:flex-col sm:gap-1">
                       <ShareButton code={code.code} brand={code.brand} brandSlug={code.brandSlug} description={code.description} />
@@ -239,7 +240,7 @@ export default async function BrandPage({ params, searchParams }: Props) {
                   We don&rsquo;t have codes for {brand} yet
                 </p>
                 <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  Be the first to contribute and earn <span style={{ color: '#f59e0b', fontWeight: 700 }}>5 Fuel</span>!
+                  Be the first to submit a working code for {brand}!
                 </p>
                 <Link
                   href="/auth/register?intent=submit"

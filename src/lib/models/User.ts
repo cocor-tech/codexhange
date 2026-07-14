@@ -5,7 +5,6 @@ export interface IUser extends Document {
   email: string;
   emailVerified?: Date;
   image?: string;
-  fuelBalance: number;
   fingerprintHashes: string[];
   isAdmin: boolean;
   createdAt: Date;
@@ -18,7 +17,6 @@ const UserSchema = new Schema<IUser>(
     email: { type: String, required: true, unique: true },
     emailVerified: { type: Date },
     image: { type: String },
-    fuelBalance: { type: Number, default: 0 },
     fingerprintHashes: { type: [String], default: [] },
     isAdmin: { type: Boolean, default: false },
   },

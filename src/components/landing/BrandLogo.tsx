@@ -28,13 +28,14 @@ export function BrandLogo({ brand, slug, size = 48 }: Props) {
   const [error, setError] = useState(false);
   const domain = DOMAIN_MAP[slug];
   const src = domain ? `https://logo.clearbit.com/${domain}?size=${size}` : null;
+  const showFallback = !src || error || !loaded;
 
   return (
     <span
       className="flex items-center justify-center rounded-xl overflow-hidden"
       style={{ width: size, height: size, backgroundColor: '#d9770620' }}
     >
-      {!loaded && !error && (
+      {showFallback && (
         <span className="text-lg font-bold" style={{ color: '#f59e0b' }}>
           {brand.charAt(0)}
         </span>
@@ -52,11 +53,6 @@ export function BrandLogo({ brand, slug, size = 48 }: Props) {
           className={loaded ? 'block' : 'hidden'}
           style={{ objectFit: 'contain' }}
         />
-      )}
-      {!src && (
-        <span className="text-lg font-bold" style={{ color: '#f59e0b' }}>
-          {brand.charAt(0)}
-        </span>
       )}
     </span>
   );

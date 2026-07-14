@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
@@ -103,7 +102,13 @@ export default function AdminPage() {
     );
   }
 
-  if (status === 'unauthenticated') redirect('/auth/login');
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      window.location.href = '/auth/login';
+    }
+  }, [status]);
+
+  if (status === 'unauthenticated') return null;
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-base)' }}>
@@ -170,7 +175,6 @@ export default function AdminPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{c.brand}</span>
-                      {c.boosted && <span className="text-[10px] font-bold" style={{ color: '#f59e0b' }}>BOOSTED</span>}
                       {c.archived && <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>ARCHIVED</span>}
                     </div>
                     <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
@@ -188,9 +192,7 @@ export default function AdminPage() {
                         Unarchive
                       </button>
                     )}
-                    <button onClick={() => handleCodeAction(c._id, c.boosted ? 'unboost' : 'boost')} className="rounded-md px-2 py-1 text-[10px] font-medium border hover:bg-brand-500/10" style={{ borderColor: 'var(--border)', color: '#f59e0b' }}>
-                      {c.boosted ? 'Unboost' : 'Boost'}
-                    </button>
+
                     <button onClick={() => handleDeleteCode(c._id)} className="rounded-md px-2 py-1 text-[10px] font-medium border hover:bg-red-500/10" style={{ borderColor: 'var(--border)', color: '#ef4444' }}>
                       Delete
                     </button>
@@ -222,7 +224,7 @@ export default function AdminPage() {
                       {u.isAdmin && <span className="text-[10px] rounded-full px-1.5 py-0.5 font-bold" style={{ backgroundColor: '#ef444420', color: '#ef4444' }}>ADMIN</span>}
                     </div>
                     <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                      {u.email} · {u.fuelBalance} Fuel · {u.fingerprintHashes?.length || 0} device{u.fingerprintHashes?.length !== 1 ? 's' : ''}
+                      {u.email} · {u.fingerprintHashes?.length || 0} device{u.fingerprintHashes?.length !== 1 ? 's' : ''}
                     </p>
                   </div>
                   <button onClick={() => handleToggleAdmin(u._id)} className="rounded-md px-3 py-1 text-xs font-medium border hover:bg-brand-500/10 shrink-0 ml-3" style={{ borderColor: 'var(--border)', color: u.isAdmin ? '#ef4444' : 'var(--text-muted)' }}>
@@ -252,8 +254,8 @@ export default function AdminPage() {
               <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Total Users</p>
             </div>
             <div className="glass-card text-center py-8">
-              <p className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>{users.reduce((s, u: any) => s + (u.fuelBalance || 0), 0)}</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Total Fuel in Circulation</p>
+              <p className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>{users.length}</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Total Users</p>
             </div>
           </div>
         )}

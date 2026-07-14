@@ -5,17 +5,15 @@ import { useState, useEffect } from 'react';
 interface Activity {
   user: string;
   action: string;
-  fuel: number;
-  type: string;
   time: string;
 }
 
 const FALLBACK_FEED: Activity[] = [
-  { user: 'Sarah', action: 'verified a NordVPN promo code', fuel: 10, type: 'earned', time: new Date(Date.now() - 120000).toISOString() },
-  { user: 'Mike', action: 'submitted an Uber discount code', fuel: 5, type: 'earned', time: new Date(Date.now() - 300000).toISOString() },
-  { user: 'Emma', action: 'voted on a Nike promo', fuel: 10, type: 'earned', time: new Date(Date.now() - 600000).toISOString() },
-  { user: 'Alex', action: 'boosted a DoorDash code', fuel: 50, type: 'spent', time: new Date(Date.now() - 900000).toISOString() },
-  { user: 'Jordan', action: 'verified a Spotify discount', fuel: 10, type: 'earned', time: new Date(Date.now() - 1800000).toISOString() },
+  { user: 'Sarah', action: 'verified a NordVPN promo code', time: new Date(Date.now() - 120000).toISOString() },
+  { user: 'Mike', action: 'submitted an Uber discount code', time: new Date(Date.now() - 300000).toISOString() },
+  { user: 'Emma', action: 'voted on a Nike promo', time: new Date(Date.now() - 600000).toISOString() },
+  { user: 'Alex', action: 'submitted a DoorDash code', time: new Date(Date.now() - 900000).toISOString() },
+  { user: 'Jordan', action: 'verified a Spotify discount', time: new Date(Date.now() - 1800000).toISOString() },
 ];
 
 function timeAgo(dateStr: string) {
@@ -70,9 +68,6 @@ export function LiveActivityFeed() {
                 {timeAgo(item.time)}
               </p>
             </div>
-            <span className={`shrink-0 text-xs font-semibold ${item.type === 'earned' ? 'text-green-400' : 'text-red-400'}`}>
-              {item.type === 'earned' ? '+' : '-'}{item.fuel} Fuel
-            </span>
           </div>
         ))}
       </div>

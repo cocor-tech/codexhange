@@ -3,9 +3,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/mongoose';
 import Code from '@/lib/models/Code';
-import User from '@/lib/models/User';
-import FuelLedger from '@/lib/models/FuelLedger';
 import { verifyFingerprint } from '@/lib/requireFingerprint';
+
+export const dynamic = 'force-dynamic';
 
 const DUSTBIN_THRESHOLD = 5;
 const DUSTBIN_RATIO = 0.3;
@@ -50,15 +50,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   await code.save();
-
-  await User.findByIdAndUpdate(session.user.id, { $inc: { fuelBalance: 10 } });
-  await FuelLedger.create({
-    userId: session.user.id,
-    amount: 10,
-    type: 'earned',
-    reason: 'vote',
-    reference: code._id.toString(),
-  });
 
   return NextResponse.json({ code });
 }

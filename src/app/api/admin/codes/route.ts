@@ -5,6 +5,8 @@ import { connectDB } from '@/lib/mongoose';
 import User from '@/lib/models/User';
 import Code from '@/lib/models/Code';
 
+export const dynamic = 'force-dynamic';
+
 async function requireAdmin() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return null;
@@ -50,7 +52,7 @@ export async function PATCH(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
 
   const { codeId, action } = await req.json();
-  if (!codeId || !['archive', 'unarchive', 'boost', 'unboost'].includes(action)) {
+  if (!codeId || !['archive', 'unarchive'].includes(action)) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
 
@@ -59,8 +61,6 @@ export async function PATCH(req: NextRequest) {
   const update: any = {};
   if (action === 'archive') { update.archived = true; update.archivedAt = new Date(); }
   if (action === 'unarchive') { update.archived = false; update.archivedAt = null; }
-  if (action === 'boost') { update.boosted = true; }
-  if (action === 'unboost') { update.boosted = false; update.boostedUntil = null; }
 
   const code = await Code.findByIdAndUpdate(codeId, update, { new: true }).lean();
   if (!code) return NextResponse.json({ error: 'Code not found' }, { status: 404 });

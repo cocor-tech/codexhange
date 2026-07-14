@@ -59,7 +59,7 @@ export default async function HomePage() {
     '@type': 'Organization',
     name: 'CodeXhange',
     url: 'https://codexhange.com',
-    description: 'Community-driven promo code library powered by a Fuel economy.',
+    description: 'Community-driven promo code library. Find verified discount codes and deals.',
   };
 
   return (
@@ -76,7 +76,6 @@ export default async function HomePage() {
             <RegionSelector />
             <ThemeToggle />
             <Link href="/auth/login" className="btn-glass px-3 py-1.5 text-xs sm:text-sm">Sign in</Link>
-            <Link href="/auth/register" className="btn-primary px-3 py-1.5 text-xs sm:text-sm">Join</Link>
           </div>
         </header>
 
@@ -110,37 +109,37 @@ export default async function HomePage() {
             {/* How It Works — 2/3 */}
             <div className="lg:col-span-2">
               <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                How the Fuel Economy Works
+                How CodeXhange Works
               </h2>
               <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                Earn Fuel by contributing. Spend it to promote your own deals.
+                Find verified codes in seconds. Post your own and earn affiliate commissions.
               </p>
               <div className="mt-6 grid gap-4 sm:grid-cols-3">
                 <div className="glass-card">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold" style={{ backgroundColor: '#d9770620', color: '#f59e0b' }}>1</div>
-                  <h3 className="mt-3 font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Drop or Verify</h3>
+                  <h3 className="mt-3 font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Search or Browse</h3>
                   <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                    Submit a working code or vote on existing ones. Earn 5-10 Fuel per action.
+                    Find any brand and copy active promo codes instantly. No account needed.
                   </p>
                 </div>
                 <div className="glass-card">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold" style={{ backgroundColor: '#d9770620', color: '#f59e0b' }}>2</div>
-                  <h3 className="mt-3 font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Fill Your Tank</h3>
+                  <h3 className="mt-3 font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Submit Your Codes</h3>
                   <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                    Refer friends to earn 100 Fuel each. The more active users you bring, the more you earn.
+                    Post discount codes with your affiliate link. Earn real commissions when people use them.
                   </p>
                 </div>
                 <div className="glass-card">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl text-lg font-bold" style={{ backgroundColor: '#d9770620', color: '#f59e0b' }}>3</div>
-                  <h3 className="mt-3 font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Boost Your Brand</h3>
+                  <h3 className="mt-3 font-bold text-sm" style={{ color: 'var(--text-primary)' }}>Vote &amp; Trust</h3>
                   <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                    Burn Fuel to pin your codes to the top of any brand page. Zero-cost advertising.
+                    Community votes keep expired codes buried. Verified codes rise to the top.
                   </p>
                 </div>
               </div>
               <div className="mt-6 text-center">
-                <Link href="/auth/register" className="btn-primary px-5 py-2.5 text-sm">
-                  Start Earning Fuel
+                <Link href="/auth/login" className="btn-primary px-5 py-2.5 text-sm">
+                  Start Contributing
                 </Link>
               </div>
             </div>
@@ -189,10 +188,10 @@ export default async function HomePage() {
           </h2>
           <div className="mt-8 space-y-3">
             {[
-              { q: 'Do I need an account to use promo codes?', a: 'No. Browse, search, and copy any code without an account. Login is only needed to submit codes, vote, or boost.' },
-              { q: 'How do you ensure codes are active?', a: 'Community voting system. Codes with 5+ no-votes and under 30% success auto-archive. The Dustbin keeps only accurate deals indexed.' },
-              { q: 'What is Fuel and how do I earn it?', a: 'Fuel is our virtual token. Earn 5 by submitting a code, 10 by voting, 100 by referring a friend.' },
-              { q: 'How do boosts work for my business?', a: 'Micro-boost (50 Fuel) = 15 guaranteed clicks. Mega-boost (500 Fuel) = 7 days pinned top placement.' },
+              { q: 'Do I need an account to use promo codes?', a: 'No. Browse, search, and copy any code without an account. Login is only needed to submit codes or vote.' },
+              { q: 'How do you ensure codes are active?', a: 'Community voting system. Codes with 5+ downvotes and under 30% success rate auto-archive. The Dustbin keeps only accurate deals indexed.' },
+              { q: 'Can I earn money by posting codes?', a: 'Yes. Attach your affiliate referral link when submitting a code. When shoppers use your link, you earn commissions from the merchant.' },
+              { q: 'How does the community keep codes accurate?', a: 'Every code has upvote/downvote buttons. Expired codes get downvoted and auto-archive. Verified codes rise to the top.' },
               { q: 'Can I see codes for my country?', a: 'Yes. Use the region selector in the header or visit any brand page with ?country=XX to filter local deals.' },
             ].map((faq) => (
               <details key={faq.q} className="glass-card group open:pb-4">

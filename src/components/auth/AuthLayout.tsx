@@ -13,7 +13,7 @@ const pageConfig: Record<string, { title: string; desc: string }> = {
   },
   '/auth/register': {
     title: 'Join CodeXhange',
-    desc: 'Create an account and start earning Fuel rewards.',
+    desc: 'Create an account and start contributing promo codes.',
   },
   '/auth/forgot-password': {
     title: 'Reset your password',

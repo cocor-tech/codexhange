@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'About CodeXhange | Community Promo Code Library',
-  description: 'CodeXhange is a community-driven discount code platform powered by a Fuel economy. Learn how we keep promo codes verified and up to date.',
+  description: 'CodeXhange is a community-driven discount code platform. Learn how we keep promo codes verified and up to date.',
 };
 
 export default function AboutPage() {
@@ -14,7 +14,7 @@ export default function AboutPage() {
           <p>
             CodeXhange is a community-driven search engine for active promo codes and discount codes. 
             Unlike traditional coupon sites that rely on automated scraping and leave expired codes 
-            live indefinitely, CodeXhange uses a gamified Fuel economy to incentivize real users 
+            live indefinitely, CodeXhange relies on community voting to keep codes 
             to curate, verify, and share working discounts.
           </p>
           <p>
@@ -24,7 +24,7 @@ export default function AboutPage() {
             active deals — and shoppers never waste time on expired codes.
           </p>
           <p>
-            Merchants, creators, and affiliate marketers can use Fuel to boost their promo codes 
+            Merchants, creators, and affiliate marketers can submit their promo codes 
             to the top of high-traffic brand pages. This creates a decentralized advertising economy 
             where contributors are rewarded for their efforts and businesses get free, targeted visibility.
           </p>
