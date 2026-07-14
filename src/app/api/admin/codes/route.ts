@@ -1,25 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/mongoose';
-import User from '@/lib/models/User';
 import Code from '@/lib/models/Code';
 
 export const dynamic = 'force-dynamic';
 
-async function requireAdmin() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) return null;
-  await connectDB();
-  const user = await User.findById(session.user.id).select('isAdmin');
-  if (!user?.isAdmin) return null;
-  return session;
-}
-
 export async function GET(req: NextRequest) {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-
   const { searchParams } = new URL(req.url);
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '50');
@@ -48,9 +33,6 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-
   const { codeId, action } = await req.json();
   if (!codeId || !['archive', 'unarchive'].includes(action)) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
@@ -69,9 +51,6 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const session = await requireAdmin();
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-
   const { codeId } = await req.json();
   if (!codeId) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 

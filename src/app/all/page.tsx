@@ -72,8 +72,8 @@ export default async function AllPage() {
           <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
             All Brands
           </h2>
-          <Link href="/auth/login" className="btn-primary px-4 py-2 text-xs">
-            Submit a Code
+          <Link href="/" className="btn-primary px-4 py-2 text-xs">
+            Browse
           </Link>
         </div>
         <TrendingGrid initial={trendingBrands} />

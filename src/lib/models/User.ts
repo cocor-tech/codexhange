@@ -5,7 +5,6 @@ export interface IUser extends Document {
   email: string;
   emailVerified?: Date;
   image?: string;
-  fingerprintHashes: string[];
   isAdmin: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -17,12 +16,9 @@ const UserSchema = new Schema<IUser>(
     email: { type: String, required: true, unique: true },
     emailVerified: { type: Date },
     image: { type: String },
-    fingerprintHashes: { type: [String], default: [] },
     isAdmin: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
-
-UserSchema.index({ fingerprintHashes: 1 });
 
 export default mongoose.models.User || mongoose.model<IUser>('User', UserSchema);

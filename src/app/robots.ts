@@ -5,8 +5,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/brand/', '/auth/login', '/auth/register'],
-        disallow: ['/api/', '/dashboard/', '/_next/'],
+        allow: ['/', '/brand/'],
+        disallow: ['/api/', '/_next/'],
       },
     ],
     sitemap: 'https://codexhange.com/sitemap.xml',

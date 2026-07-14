@@ -12,7 +12,6 @@ export interface ICode extends Document {
   affiliateLink?: string;
   scope: 'global' | 'local';
   country?: string;
-  submittedBy: mongoose.Types.ObjectId;
   upvotes: number;
   downvotes: number;
   clicks: number;
@@ -34,7 +33,6 @@ const CodeSchema = new Schema<ICode>(
     link: { type: String },
     scope: { type: String, enum: ['global', 'local'], default: 'global' },
     country: { type: String },
-    submittedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     upvotes: { type: Number, default: 0 },
     downvotes: { type: Number, default: 0 },
     clicks: { type: Number, default: 0 },

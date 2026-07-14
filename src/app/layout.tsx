@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { Poppins } from 'next/font/google';
-import { SessionProvider } from '@/lib/SessionProvider';
 import { ToastProvider } from '@/components/ui/Toast';
 import { Navbar } from '@/components/Navbar';
 import Link from 'next/link';
@@ -47,7 +46,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{
           __html: `(function(){try{var t=localStorage.getItem('codexhange-theme');document.documentElement.className=t||'light'}catch(e){}})()`
         }} />
-        <SessionProvider>
           <ToastProvider>
           <Navbar />
           <div className="flex-1">{children}</div>
@@ -93,8 +91,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   <ul className="space-y-1.5">
                     <li><Link href="/about" className="hover:text-[--text-primary] transition-colors">About CodeXhange</Link></li>
                     <li><Link href="/contact" className="hover:text-[--text-primary] transition-colors">Contact Us</Link></li>
-                    <li><Link href="/auth/register" className="hover:text-[--text-primary] transition-colors">Create Account</Link></li>
-                    <li><Link href="/auth/login" className="hover:text-[--text-primary] transition-colors">Sign In</Link></li>
                   </ul>
                 </div>
                 <div>
@@ -112,7 +108,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
           </footer>
           </ToastProvider>
-        </SessionProvider>
       </body>
     </html>
   );

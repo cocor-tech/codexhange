@@ -75,7 +75,6 @@ export default async function HomePage() {
           <div className="flex items-center gap-2 sm:gap-3">
             <RegionSelector />
             <ThemeToggle />
-            <Link href="/auth/login" className="btn-glass px-3 py-1.5 text-xs sm:text-sm">Sign in</Link>
           </div>
         </header>
 
@@ -138,8 +137,8 @@ export default async function HomePage() {
                 </div>
               </div>
               <div className="mt-6 text-center">
-                <Link href="/auth/login" className="btn-primary px-5 py-2.5 text-sm">
-                  Start Contributing
+                <Link href="/all" className="btn-primary px-5 py-2.5 text-sm">
+                  Browse All Codes
                 </Link>
               </div>
             </div>

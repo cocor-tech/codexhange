@@ -1,8 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { getDeviceFingerprint } from '@/lib/fingerprint';
 
 interface VoteButtonsProps {
   codeId: string;
@@ -12,7 +10,6 @@ interface VoteButtonsProps {
 }
 
 export function VoteButtons({ codeId, upvotes, downvotes, onVote }: VoteButtonsProps) {
-  const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -20,18 +17,13 @@ export function VoteButtons({ codeId, upvotes, downvotes, onVote }: VoteButtonsP
   const pct = total > 0 ? Math.round((upvotes / total) * 100) : 0;
 
   const handleVote = async (vote: 'up' | 'down') => {
-    if (!session) return;
     setLoading(true);
     setError('');
 
     try {
-      const fp = getDeviceFingerprint();
       const res = await fetch(`/api/codes/${codeId}/vote`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Device-Fingerprint': fp,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ vote }),
       });
       const data = await res.json();
@@ -51,10 +43,9 @@ export function VoteButtons({ codeId, upvotes, downvotes, onVote }: VoteButtonsP
     <div className="flex items-center gap-2">
       <button
         onClick={() => handleVote('up')}
-        disabled={loading || !session}
+        disabled={loading}
         className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-green-500/10 disabled:opacity-40"
         style={{ color: upvotes > downvotes ? '#22c55e' : 'var(--text-muted)' }}
-        title={session ? 'Upvote' : 'Sign in to vote'}
       >
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
@@ -71,10 +62,9 @@ export function VoteButtons({ codeId, upvotes, downvotes, onVote }: VoteButtonsP
 
       <button
         onClick={() => handleVote('down')}
-        disabled={loading || !session}
+        disabled={loading}
         className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-red-500/10 disabled:opacity-40"
         style={{ color: downvotes > upvotes ? '#ef4444' : 'var(--text-muted)' }}
-        title={session ? 'Downvote' : 'Sign in to vote'}
       >
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />

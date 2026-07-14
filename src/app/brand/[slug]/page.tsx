@@ -243,10 +243,10 @@ export default async function BrandPage({ params, searchParams }: Props) {
                   Be the first to submit a working code for {brand}!
                 </p>
                 <Link
-                  href="/auth/register?intent=submit"
+                  href="/"
                   className="btn-primary mt-6 inline-flex px-5 py-2.5 text-sm"
                 >
-                  Drop the First {brand} Code &rarr;
+                  Browse All Codes &rarr;
                 </Link>
               </div>
 

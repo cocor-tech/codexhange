@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/mongoose';
 import Code from '@/lib/models/Code';
-import { verifyFingerprint } from '@/lib/requireFingerprint';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,14 +8,6 @@ const DUSTBIN_THRESHOLD = 5;
 const DUSTBIN_RATIO = 0.3;
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  }
-
-  const fpOk = await verifyFingerprint(req, session.user.id);
-  if (fpOk !== true) return fpOk;
-
   const { vote } = await req.json();
   if (vote !== 'up' && vote !== 'down') {
     return NextResponse.json({ error: 'Invalid vote' }, { status: 400 });

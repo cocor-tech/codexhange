@@ -17,9 +17,9 @@ export default function PrivacyPage() {
             your information when you visit our website.
           </p>
           <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Information We Collect</h2>
-          <p>We collect minimal data: email address (if you create an account), browser fingerprint hash (for anti-abuse), and anonymous usage analytics.</p>
+          <p>We collect minimal data: email address and anonymous usage analytics.</p>
           <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Cookies</h2>
-          <p>We use essential cookies for authentication (NextAuth.js session tokens) and local storage for theme preferences. We do not use tracking cookies.</p>
+          <p>We use local storage for theme preferences. We do not use tracking cookies.</p>
           <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Third-Party Services</h2>
           <p>We use Cloudflare for CDN and security. We use Google OAuth only if you choose to sign in with Google. We do not sell your data.</p>
           <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Contact</h2>

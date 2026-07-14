@@ -229,10 +229,10 @@ function SearchPageContent() {
               Be the first to submit a working code for this brand!
             </p>
             <Link
-              href={`/auth/register?intent=submit&brand=${encodeURIComponent(extractedBrand?.brand || query)}`}
+              href="/"
               className="btn-primary mt-5 inline-flex px-5 py-2.5 text-sm"
             >
-              ➕ Be the first to submit a code for {extractedBrand?.brand || query}
+              Browse All Codes
             </Link>
           </div>
         )}

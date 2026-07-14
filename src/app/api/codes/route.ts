@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 import { connectDB } from '@/lib/mongoose';
 import Code from '@/lib/models/Code';
-import { verifyFingerprint } from '@/lib/requireFingerprint';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
@@ -46,14 +43,6 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
-  }
-
-  const fpOk = await verifyFingerprint(req, session.user.id);
-  if (fpOk !== true) return fpOk;
-
   const body = await req.json();
   const parsed = submitSchema.safeParse(body);
   if (!parsed.success) {
@@ -62,10 +51,7 @@ export async function POST(req: NextRequest) {
 
   await connectDB();
 
-  const code = await Code.create({
-    ...parsed.data,
-    submittedBy: session.user.id,
-  });
+  const code = await Code.create(parsed.data);
 
   return NextResponse.json({ code }, { status: 201 });
 }
