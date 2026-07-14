@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongoose';
 import Brand from '@/lib/models/Brand';
-import { domainRegistrars } from '@/lib/data/domainRegistrars';
+import { allBrands } from '@/lib/data/brands';
 
 export const dynamic = 'force-dynamic';
+
+const defaultExtensions = ['.com', '.net', '.org', '.ai', '.io', '.dev', '.app', '.xyz', '.co', '.me'];
 
 export async function POST() {
   await connectDB();
@@ -11,18 +13,20 @@ export async function POST() {
   let created = 0;
   let skipped = 0;
 
-  for (const reg of domainRegistrars) {
-    const existing = await Brand.findOne({ name: reg.name });
+  for (const entry of allBrands) {
+    const existing = await Brand.findOne({ name: entry.name, category: entry.category });
     if (existing) {
       skipped++;
       continue;
     }
 
     await Brand.create({
-      ...reg,
-      category: 'Domain Names & Domain Registrars',
-      country: 'US',
+      name: entry.name,
+      website: entry.website,
+      category: entry.category,
       hasPromoCodes: true,
+      hasReferralProgram: entry.hasReferralProgram,
+      country: 'US',
       discounts: {
         firstYear: true,
         transfer: true,
@@ -37,13 +41,11 @@ export async function POST() {
         anniversary: false,
         flashSale: true,
       },
-      extensions: ['.com', '.net', '.org', '.ai', '.io', '.dev', '.app', '.xyz', '.co', '.me'],
+      extensions: defaultExtensions,
     });
 
     created++;
   }
 
-  const total = await Brand.countDocuments({ category: 'Domain Names & Domain Registrars' });
-
-  return NextResponse.json({ created, skipped, total });
+  return NextResponse.json({ created, skipped, total: created + skipped });
 }

@@ -32,7 +32,7 @@ export interface IBrand extends Document {
 
 const BrandSchema = new Schema<IBrand>(
   {
-    name: { type: String, required: true, unique: true },
+    name: { type: String, required: true },
     website: { type: String, required: true },
     category: { type: String, required: true, index: true },
     hasPromoCodes: { type: Boolean, default: true },
@@ -61,6 +61,6 @@ const BrandSchema = new Schema<IBrand>(
   { timestamps: true }
 );
 
-BrandSchema.index({ category: 1, name: 1 });
+BrandSchema.index({ name: 1, category: 1 }, { unique: true });
 
 export default mongoose.models.Brand || mongoose.model<IBrand>('Brand', BrandSchema);
