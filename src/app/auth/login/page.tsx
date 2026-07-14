@@ -32,6 +32,7 @@ export default function LoginPage() {
       const msg = errorMessages[err] || errorMessages.default;
       setUrlError(msg);
       toast(msg, 'error');
+      window.history.replaceState({}, '', '/auth/login');
     }
   }, [toast]);
 
