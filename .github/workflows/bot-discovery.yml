@@ -1,0 +1,53 @@
+name: Bot Discovery
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # Daily at 6am UTC
+  workflow_dispatch:        # Manual trigger from GitHub UI
+    inputs:
+      maxBrands:
+        description: 'Max brands to process (leave empty for all)'
+        required: false
+        default: ''
+      processQueue:
+        description: 'Process admin queued jobs first'
+        type: boolean
+        default: true
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: bot/package-lock.json
+
+      - run: npm ci
+        working-directory: bot
+
+      - name: Process admin queued jobs
+        if: inputs.processQueue == true || github.event_name == 'schedule'
+        run: |
+          while node standalone.js --queue; do
+            echo "Processing next job..."
+          done
+        working-directory: bot
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+
+      - name: Discover all brands
+        run: |
+          MAX="${{ inputs.maxBrands }}"
+          if [ -n "$MAX" ]; then
+            node standalone.js --brands --max "$MAX"
+          else
+            node standalone.js --brands
+          fi
+        working-directory: bot
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}

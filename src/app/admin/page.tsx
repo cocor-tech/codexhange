@@ -121,13 +121,13 @@ function BrandsTab({ onMsg }: { onMsg: (s: string) => void }) {
   useEffect(() => { loadBrands(page, search); }, [page]);
 
   const triggerDiscover = async (brandId: string, name: string) => {
-    onMsg(`Queued: ${name}`);
-    // In production, this would call the bot API
-    await window.fetch('/api/bot/discover', {
+    const res = await window.fetch('/api/admin/brands/queue', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ brandId }),
     });
+    if (res.ok) onMsg(`Queued ${name} — will be discovered by bot`);
+    else onMsg('Failed to queue');
   };
 
   return (
