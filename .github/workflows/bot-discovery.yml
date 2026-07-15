@@ -28,6 +28,10 @@ jobs:
       - run: npm ci
         working-directory: bot
 
+      - name: Install Playwright browsers (for JS-heavy sites)
+        run: npx playwright install chromium
+        working-directory: bot
+
       - name: Process admin queued jobs
         run: |
           while node standalone.js --queue; do
