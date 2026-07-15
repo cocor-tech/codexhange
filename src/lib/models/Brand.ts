@@ -2,8 +2,9 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IBrand extends Document {
   name: string;
+  slug: string;
   website: string;
-  category: string;
+  categories: mongoose.Types.ObjectId[];
   hasPromoCodes: boolean;
   hasReferralProgram: boolean;
   country: string;
@@ -25,6 +26,14 @@ export interface IBrand extends Document {
   referralLink?: string;
   notes?: string;
   active: boolean;
+  discovery: {
+    enabled: boolean;
+    crawlDelay: number;
+    crawlDepth: number;
+    allowGoogleSearch: boolean;
+    allowSitemap: boolean;
+    allowReferral: boolean;
+  };
   lastChecked?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -33,8 +42,9 @@ export interface IBrand extends Document {
 const BrandSchema = new Schema<IBrand>(
   {
     name: { type: String, required: true },
+    slug: { type: String, required: true, lowercase: true },
     website: { type: String, required: true },
-    category: { type: String, required: true, index: true },
+    categories: [{ type: Schema.Types.ObjectId, ref: 'Category' }],
     hasPromoCodes: { type: Boolean, default: true },
     hasReferralProgram: { type: Boolean, default: false },
     country: { type: String, default: 'US' },
@@ -56,11 +66,20 @@ const BrandSchema = new Schema<IBrand>(
     referralLink: { type: String },
     notes: { type: String },
     active: { type: Boolean, default: true },
+    discovery: {
+      enabled: { type: Boolean, default: true },
+      crawlDelay: { type: Number, default: 3000 },
+      crawlDepth: { type: Number, default: 2 },
+      allowGoogleSearch: { type: Boolean, default: false },
+      allowSitemap: { type: Boolean, default: true },
+      allowReferral: { type: Boolean, default: true },
+    },
     lastChecked: { type: Date },
   },
   { timestamps: true }
 );
 
-BrandSchema.index({ name: 1, category: 1 }, { unique: true });
+BrandSchema.index({ slug: 1 });
+BrandSchema.index({ categories: 1 });
 
 export default mongoose.models.Brand || mongoose.model<IBrand>('Brand', BrandSchema);
