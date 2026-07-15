@@ -2,7 +2,16 @@ import 'dotenv/config';
 import { connect, close } from './db.js';
 import { discoverByUrlPatterns } from './strategies/urlPatterns.js';
 import { discoverBySitemap } from './strategies/sitemap.js';
+import { scanHomepage } from './strategies/homepage.js';
+import { searchDeals } from './strategies/searchDork.js';
 import pLimit from 'p-limit';
+
+let discoverWithPlaywright;
+try {
+  discoverWithPlaywright = (await import('./strategies/playwright.js')).discoverWithPlaywright;
+} catch {
+  // Playwright not available
+}
 
 const LIMIT = parseInt(process.env.CONCURRENCY || '5');
 const limit = pLimit(LIMIT);
@@ -20,13 +29,23 @@ async function processBrand(db, brand) {
     return { brand: brand.name, offers: 0, error: 'no_service' };
   }
 
-  const [patterns, sitemap] = await Promise.all([
+  const strategies = [
     discoverByUrlPatterns({ brandId: id, brandName: brand.name, website: brand.website }),
     discoverBySitemap({ brandId: id, brandName: brand.name, website: brand.website }),
-  ]);
+    scanHomepage({ brandName: brand.name, website: brand.website }),
+    searchDeals({ brandName: brand.name, website: brand.website }),
+  ];
+
+  // Add Playwright if available (for JS-heavy sites)
+  if (discoverWithPlaywright) {
+    strategies.push(discoverWithPlaywright({ brandName: brand.name, website: brand.website }));
+  }
+
+  const settled = await Promise.allSettled(strategies);
+  const allDiscovered = settled.flatMap(r => r.status === 'fulfilled' ? r.value : []);
 
   const seen = new Set();
-  const results = [...patterns, ...sitemap].filter(r => {
+  const results = allDiscovered.filter(r => {
     const k = r.sourceUrl.replace(/\/$/, '').toLowerCase();
     if (seen.has(k)) return false;
     seen.add(k);
