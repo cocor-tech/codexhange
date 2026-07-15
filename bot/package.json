@@ -4,15 +4,14 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "worker:discovery": "node workers/discovery.js",
-    "worker:verify": "node workers/verify.js",
-    "dev": "node --watch index.js"
+    "discover": "node index.js --discover",
+    "verify": "node index.js --verify",
+    "discover:brand": "node index.js --brand"
   },
   "dependencies": {
-    "bullmq": "^5.12.0",
-    "ioredis": "^5.4.1",
     "cheerio": "^1.0.0",
     "node-fetch": "^3.3.2",
-    "p-limit": "^6.1.0"
+    "p-limit": "^6.1.0",
+    "mongodb": "^6.3.0"
   }
 }

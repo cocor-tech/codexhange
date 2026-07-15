@@ -1,30 +1,19 @@
-import { Worker } from 'bullmq';
-import { connection } from '../queue.js';
+import { createDiscoveryWorker } from '../queue.js';
 import { discoverByUrlPatterns } from '../strategies/urlPatterns.js';
 import { discoverBySitemap } from '../strategies/sitemap.js';
 
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:3000';
-const API_KEY = process.env.BOT_API_KEY || '';
 
 async function submitOffer(offer) {
   try {
     const res = await fetch(`${API_BASE}/api/admin/offers`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-bot-api-key': API_KEY,
-        'x-verified-by': 'bot',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(offer),
     });
-
-    if (res.ok) {
-      const data = await res.json();
-      return data.offer;
-    }
-
-    if (res.status === 409) return null; // duplicate
-    console.error(`  Submit failed (${res.status}): ${offer.title}`);
+    if (res.ok) return (await res.json()).offer;
+    if (res.status === 409) return null;
+    console.error(`  Submit ${res.status}: ${offer.title}`);
     return null;
   } catch (err) {
     console.error(`  Submit error:`, err.message);
@@ -32,23 +21,21 @@ async function submitOffer(offer) {
   }
 }
 
-const worker = new Worker('discovery', async (job) => {
+const worker = createDiscoveryWorker(async (job) => {
   const { brandId, brandName, website } = job.data;
   console.log(`[Discovery] ${brandName} (${website})`);
 
-  // Strategy 1: URL patterns
-  const patternResults = await discoverByUrlPatterns({ brandId, brandName, website });
-  console.log(`  URL patterns: ${patternResults.length} results`);
-
-  // Strategy 2: Sitemap scanning
-  const sitemapResults = await discoverBySitemap({ brandId, brandName, website });
-  console.log(`  Sitemap: ${sitemapResults.length} results`);
+  const [patternResults, sitemapResults] = await Promise.all([
+    discoverByUrlPatterns({ brandId, brandName, website }),
+    discoverBySitemap({ brandId, brandName, website }),
+  ]);
 
   const allResults = [...patternResults, ...sitemapResults];
+  console.log(`  URL patterns: ${patternResults.length}, Sitemap: ${sitemapResults.length}`);
 
   let submitted = 0;
   for (const result of allResults) {
-    const offerPayload = {
+    const payload = {
       serviceId: brandId,
       title: result.title,
       discount: result.discount,
@@ -59,33 +46,19 @@ const worker = new Worker('discovery', async (job) => {
       countries: ['US'],
       confidence: result.confidence,
       status: result.confidence >= 80 ? 'pending_review' : 'discovered',
-      type: 'coupon',
+      type: result.codes?.length > 0 ? 'promo_code' : 'coupon',
+      code: result.codes?.[0],
     };
-
     if (result.codes?.length > 0) {
-      offerPayload.code = result.codes[0];
-      offerPayload.type = 'promo_code';
-      offerPayload.confidence = Math.min(result.confidence + 10, 98);
+      payload.code = result.codes[0];
+      payload.confidence = Math.min(result.confidence + 10, 98);
     }
-
-    const created = await submitOffer(offerPayload);
+    const created = await submitOffer(payload);
     if (created) submitted++;
   }
 
-  console.log(`  Submitted: ${submitted}/${allResults.length}`);
+  console.log(`  Submitted ${submitted}/${allResults.length}`);
   return { brandId, brandName, discovered: allResults.length, submitted };
-}, {
-  connection,
-  concurrency: 3,
-  lockDuration: 120000,
-});
-
-worker.on('completed', (job) => {
-  console.log(`✓ ${job.data.brandName} done — ${job.returnvalue.submitted} submitted`);
-});
-
-worker.on('failed', (job, err) => {
-  console.error(`✗ ${job?.data?.brandName || 'unknown'} failed:`, err.message);
 });
 
 console.log('Discovery worker started. Waiting for jobs...');
