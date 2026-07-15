@@ -16,38 +16,38 @@ const KEYWORDS = [
   'free trial', 'free shipping', 'student', 'first order',
 ];
 
-// Regex patterns for actual coupon codes
+// Detect actual coupon codes in text
 const CODE_PATTERNS = [
-  /\b[A-Z0-9]{4,20}\b/g,              // SAVE20, WELCOME10, FREESHIP
-  /(?:code|coupon|promo)[:\s]+([A-Z0-9]{4,20})/gi,
-  /(?:use|enter|apply)\s+code[:\s]+([A-Z0-9]{4,20})/gi,
+  /(?:code|coupon|promo)[:\s]+([A-Z0-9_\-]{4,25})/gi,
+  /(?:use|enter|apply)\s+(?:code\s+)?["']?([A-Z0-9_\-]{4,25})["']?/gi,
+  /\b([A-Z0-9]{4,20})\b(?=.*(?:off|save|discount|free))/gi,
+  /["']([A-Z0-9_\-]{4,25})["']/g,
 ];
 
-// Discount extraction patterns
 const DISCOUNT_PATTERNS = [
-  /(\d+%)\s*off/i,
-  /\$(\d+)\s*off/i,
-  /save\s+\$?(\d+|up\s+to\s+\d+%)/i,
-  /free\s+(trial|shipping|delivery)/i,
-  /up\s+to\s+(\d+%)/i,
-  /(\d+%)\s+discount/i,
+  /(\d+%)\s*off/i, /\$(\d+)\s*off/i, /save\s+\$?(\d+|up\s+to\s+\d+%)/i,
+  /free\s+(trial|shipping|delivery|domain)/i, /up\s+to\s+(\d+%)/i,
+  /(\d+%)\s+discount/i, /just\s+\$?(\d+)\/(mo|month|year)/i,
+  /starting at\s+\$?(\d+)/i, /was\s+\$?(\d+)\s+now\s+\$?(\d+)/i,
+  /(\d+)-month\s+free/i, /get\s+(\d+)%\s+off/i,
 ];
 
 const UAs = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0',
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0',
 ];
 
 function ua() { return UAs[Math.floor(Math.random() * UAs.length)]; }
 
 function extractCodes(text) {
   const found = new Set();
-  for (const pattern of CODE_PATTERNS) {
-    const matches = text.matchAll(pattern);
-    for (const m of matches) {
+  for (const p of CODE_PATTERNS) {
+    for (const m of text.matchAll(p)) {
       const code = (m[1] || m[0]).trim();
-      if (code.length >= 4 && code.length <= 20 && /[A-Z0-9]{4,}/i.test(code)) {
+      if (code.length >= 4 && code.length <= 25 && /[A-Z0-9]{3,}/i.test(code)) {
+        // Filter out false positives (numbers, dates, prices)
+        if (/^\d+$/.test(code) && code.length < 6) continue;
+        if (/^\d{2,4}$/.test(code)) continue;
         found.add(code.toUpperCase());
       }
     }
@@ -56,19 +56,94 @@ function extractCodes(text) {
 }
 
 function extractDiscount(text) {
-  for (const pattern of DISCOUNT_PATTERNS) {
-    const m = text.match(pattern);
+  for (const p of DISCOUNT_PATTERNS) {
+    const m = text.match(p);
     if (m) return m[0];
   }
   return null;
 }
 
-function extractTitle($) {
-  const h1 = $('h1').first().text().trim();
-  if (h1 && h1.length > 5 && h1.length < 200) return h1;
-  const title = $('title').text().trim();
-  if (title) return title;
-  return null;
+// Detect copy/reveal button elements
+function findCopyButtons($) {
+  const buttons = [];
+  const selectors = [
+    'button', '[class*="copy"]', '[class*="reveal"]', '[class*="show-code"]',
+    '[class*="get-code"]', '[class*="claim"]', '[class*="grab"]',
+  ];
+  for (const sel of selectors) {
+    $(sel).each((_, el) => {
+      const text = $(el).text().trim().toLowerCase();
+      if (/copy|reveal|show code|get code|claim|grab/i.test(text)) {
+        buttons.push({ text: $(el).text().trim(), html: $.html(el) });
+      }
+    });
+  }
+  return buttons;
+}
+
+// Detect coupon/deal card elements
+function findDealCards($) {
+  const cards = [];
+  $(`[class*="coupon"], [class*="deal"], [class*="offer"], [class*="promo"],
+     [class*="discount"], [class*="voucher"], [class*="code"]`).each((_, el) => {
+    const text = $(el).text().trim();
+    if (text.length > 10 && text.length < 500) {
+      cards.push({ text, html: $.html(el).slice(0, 300) });
+    }
+  });
+  return cards;
+}
+
+// Extract JSON-LD structured data
+function extractJsonLd($) {
+  const offers = [];
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      const data = JSON.parse($(el).text());
+      const items = data['@graph'] || [data];
+      for (const item of items) {
+        if (item['@type'] === 'Offer' || item['@type']?.includes('Offer')) {
+          offers.push({
+            price: item.price,
+            priceCurrency: item.priceCurrency,
+            discount: item.eligibleDiscount?.discountAmount || item.priceSpecification?.price,
+            description: item.description,
+            url: item.url,
+          });
+        }
+      }
+    } catch {}
+  });
+  return offers;
+}
+
+function scoreConfidence($, text) {
+  let score = 50;
+
+  // Keyword matches
+  const kwCount = KEYWORDS.filter(k => text.includes(k)).length;
+  score += kwCount * 6;
+
+  // Found actual codes
+  if (extractCodes(text).length > 0) score += 20;
+
+  // Found discount patterns
+  if (extractDiscount(text)) score += 10;
+
+  // Has deal cards
+  if (findDealCards($).length > 0) score += 10;
+
+  // Has copy buttons
+  if (findCopyButtons($).length > 0) score += 15;
+
+  // Has JSON-LD offers
+  if (extractJsonLd($).length > 0) score += 10;
+
+  // Title has deal keywords
+  const title = $('title').text().toLowerCase();
+  if (KEYWORDS.some(k => title.includes(k))) score += 10;
+
+  return Math.min(score, 99);
 }
 
 export async function discoverByUrlPatterns(brand) {
@@ -89,23 +164,20 @@ export async function discoverByUrlPatterns(brand) {
 
       const html = await res.text();
       const $ = cheerio.load(html);
-      const text = $('body').text().toLowerCase();
+      const text = $('body').text();
 
-      const matched = KEYWORDS.filter(kw => text.includes(kw));
-      if (matched.length < 2 && !text.match(/[A-Z0-9]{4,20}/)) continue;
+      // Must have at least 2 keywords OR actual codes
+      const kwCount = KEYWORDS.filter(k => text.toLowerCase().includes(k)).length;
+      if (kwCount < 2 && !extractCodes(text).length) continue;
 
-      // Check normalized URL for dedup
+      // Dedup
       const norm = url.replace(/\/$/, '').toLowerCase();
       if (results.some(r => r.sourceUrl.replace(/\/$/, '').toLowerCase() === norm)) continue;
 
-      const title = extractTitle($) || `${brandName} ${pattern}`;
       const codes = extractCodes(text);
       const discount = extractDiscount(text);
-
-      // Boost confidence if we found actual codes
-      let confidence = Math.min(50 + matched.length * 8, 98);
-      if (codes.length > 0) confidence = Math.min(confidence + 15, 99);
-      if (discount) confidence = Math.min(confidence + 5, 99);
+      const confidence = scoreConfidence($, text.toLowerCase());
+      const title = $('h1').first().text().trim() || $('title').text().trim() || `${brandName} ${pattern}`;
 
       results.push({
         sourceUrl: url,
@@ -116,9 +188,12 @@ export async function discoverByUrlPatterns(brand) {
         description: ($('meta[name="description"]').attr('content') || '').slice(0, 500),
         discount: discount || 'Special offer',
         codes: [...new Set(codes)],
+        hasCopyButtons: findCopyButtons($).length > 0,
+        hasDealCards: findDealCards($).length > 0,
+        jsonLdOffers: extractJsonLd($),
       });
     } catch {
-      // Timeout or network error — skip silently
+      // Skip
     }
   }
 
