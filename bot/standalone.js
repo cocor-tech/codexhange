@@ -52,7 +52,7 @@ async function processBrand(db, brand) {
       sourceUrl: r.sourceUrl,
       sourcePage: r.sourcePage || '',
       sourceReliability: 'Official Site',
-      countries: ['US'],
+      countries: brand.country && brand.country !== 'US' ? [brand.country] : [],
       confidence: r.codes?.length > 0 ? Math.min(r.confidence + 10, 98) : r.confidence,
       status: r.confidence >= 80 ? 'pending_review' : 'discovered',
       verifiedBy: 'bot',
