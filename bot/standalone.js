@@ -8,18 +8,23 @@ import { discoverByLinks } from './strategies/linkDiscovery.js';
 import { crawlBrand } from './strategies/crawler.js';
 import pLimit from 'p-limit';
 
-let discoverWithPlaywright;
-try {
-  discoverWithPlaywright = (await import('./strategies/playwright.js')).discoverWithPlaywright;
-} catch {
-  // Playwright not available
-}
-
-const LIMIT = parseInt(process.env.CONCURRENCY || '5');
+const LIMIT = parseInt(process.env.CONCURRENCY || '3');
 const limit = pLimit(LIMIT);
 
+const STRATEGIES = [
+  { name: 'urlPatterns', fn: discoverByUrlPatterns },
+  { name: 'sitemap', fn: discoverBySitemap },
+  { name: 'homepage', fn: scanHomepage },
+  { name: 'searchDork', fn: searchDeals },
+  { name: 'linkDiscovery', fn: discoverByLinks },
+  { name: 'crawler', fn: crawlBrand },
+];
+
 async function getServiceId(db, brandId) {
-  const service = await db.collection('services').findOne({ brandId: brandId.toString() });
+  const service = await db.collection('services').findOne(
+    { brandId: brandId.toString() },
+    { projection: { _id: 1 } }
+  );
   return service?._id?.toString() || null;
 }
 
@@ -27,57 +32,78 @@ async function processBrand(db, brand) {
   const id = brand._id.toString();
   const serviceId = await getServiceId(db, id);
   if (!serviceId) {
-    console.log(`  ⚠ No service for ${brand.name} — run seed first`);
-    return { brand: brand.name, offers: 0, error: 'no_service' };
+    return { brand: brand.name, offers: 0, error: 'no_service', details: 'Run seed first' };
   }
 
-  const strategies = [
-    discoverByUrlPatterns({ brandId: id, brandName: brand.name, website: brand.website }),
-    discoverBySitemap({ brandId: id, brandName: brand.name, website: brand.website }),
-    scanHomepage({ brandName: brand.name, website: brand.website }),
-    searchDeals({ brandName: brand.name, website: brand.website }),
-    discoverByLinks({ brandName: brand.name, website: brand.website }),
-    crawlBrand({ brandName: brand.name, website: brand.website }),
-  ];
+  const results = [];
+  let totalFound = 0;
 
-  // Add Playwright if available (for JS-heavy sites)
-  if (discoverWithPlaywright) {
-    strategies.push(discoverWithPlaywright({ brandName: brand.name, website: brand.website }));
+  for (const strategy of STRATEGIES) {
+    try {
+      // Rate limit between strategies (1s delay)
+      if (results.length > 0) await new Promise(r => setTimeout(r, 1000));
+
+      const discovered = await strategy.fn({
+        brandId: id,
+        brandName: brand.name,
+        website: brand.website,
+      });
+
+      if (discovered.length > 0) {
+        results.push(...discovered.map(d => ({ ...d, _strategy: strategy.name })));
+        totalFound += discovered.length;
+      }
+    } catch (err) {
+      console.error(`  [${strategy.name}] Error: ${err.message}`);
+    }
   }
 
-  const settled = await Promise.allSettled(strategies);
-  const allDiscovered = settled.flatMap(r => r.status === 'fulfilled' ? r.value : []);
-
-  const seen = new Set();
-  const results = allDiscovered.filter(r => {
-    const k = r.sourceUrl.replace(/\/$/, '').toLowerCase();
-    if (seen.has(k)) return false;
-    seen.add(k);
+  // Dedup by URL
+  const seenUrls = new Set();
+  const unique = results.filter(r => {
+    const key = r.sourceUrl.replace(/\/$/, '').toLowerCase();
+    if (seenUrls.has(key)) return false;
+    seenUrls.add(key);
     return true;
   });
 
-  let submitted = 0;
-  for (const r of results) {
-    const exists = await db.collection('offers').findOne({
-      sourceUrl: r.sourceUrl,
-      serviceId,
-    });
-    if (exists) continue;
+  // Also dedup by code value
+  const seenCodes = new Set();
+  const finalResults = unique.filter(r => {
+    const codeKey = r.codes?.length > 0 ? r.codes.join(',') : r.sourceUrl;
+    if (seenCodes.has(codeKey)) return false;
+    seenCodes.add(codeKey);
+    return true;
+  });
 
-    const now = new Date();
+  // Check which already exist in DB to avoid re-submitting
+  const existingUrls = new Set();
+  const existingDocs = await db.collection('offers').find(
+    { serviceId },
+    { projection: { sourceUrl: 1 } }
+  ).toArray();
+  existingDocs.forEach(d => existingUrls.add(d.sourceUrl.replace(/\/$/, '').toLowerCase()));
+
+  let submitted = 0;
+  const now = new Date();
+
+  for (const r of finalResults) {
+    const urlKey = r.sourceUrl.replace(/\/$/, '').toLowerCase();
+    if (existingUrls.has(urlKey)) continue;
+
     await db.collection('offers').insertOne({
       serviceId,
       type: r.codes?.length > 0 ? 'promo_code' : 'coupon',
-      title: r.title,
+      title: r.title?.slice(0, 200) || `${brand.name} offer`,
       code: r.codes?.[0] || null,
-      discount: r.discount,
-      description: r.description || '',
+      discount: r.discount || 'Special offer',
+      description: r.description?.slice(0, 500) || '',
       sourceUrl: r.sourceUrl,
       sourcePage: r.sourcePage || '',
       sourceReliability: 'Official Site',
       countries: brand.country && brand.country !== 'US' ? [brand.country] : [],
-      confidence: r.codes?.length > 0 ? Math.min(r.confidence + 10, 98) : r.confidence,
-      status: r.confidence >= 80 ? 'pending_review' : 'discovered',
+      confidence: Math.min(r.confidence || 50, 99),
+      status: (r.confidence || 0) >= 80 ? 'pending_review' : 'discovered',
       verifiedBy: 'bot',
       verifiedAt: now,
       upvotes: 0,
@@ -89,52 +115,64 @@ async function processBrand(db, brand) {
     submitted++;
   }
 
+  // Update brand's lastChecked timestamp
   await db.collection('brands').updateOne(
     { _id: brand._id },
     { $set: { lastChecked: now } }
   );
 
-  return { brand: brand.name, offers: results.length, submitted };
+  return {
+    brand: brand.name,
+    found: totalFound,
+    unique: finalResults.length,
+    submitted,
+    strategies: STRATEGIES.map(s => s.name),
+  };
 }
 
 export async function discoverAllBrands({ maxBrands, staleHours } = {}) {
   const db = await connect();
-  const filter = { active: true };
 
+  const filter = { active: true };
   if (staleHours) {
     const cutoff = new Date(Date.now() - staleHours * 60 * 60 * 1000);
     filter.$or = [
       { lastChecked: { $lt: cutoff } },
-      { lastChecked: { $eq: null } },
+      { lastChecked: null },
     ];
   }
 
   const brands = await db.collection('brands')
     .find(filter)
     .sort({ lastChecked: 1, name: 1 })
-    .limit(maxBrands || 1000)
+    .limit(maxBrands || 500)
     .toArray();
 
   console.log(`\n=== Discovering ${brands.length} brands ===\n`);
 
-  const tasks = brands.map(b => limit(() => processBrand(db, b)));
-  const results = await Promise.allSettled(tasks);
-
-  let total = 0;
+  let totalSubmitted = 0;
+  let totalFound = 0;
   let errors = 0;
-  for (const r of results) {
-    if (r.status === 'fulfilled') {
-      const d = r.value;
-      if (d.error) errors++;
-      else total += d.submitted;
-      console.log(`  ${d.brand}: ${d.submitted}/${d.offers}`);
-    } else {
+
+  const tasks = brands.map(b => limit(async () => {
+    const result = await processBrand(db, b);
+    const status = result.error ? '⚠' : '✓';
+    console.log(`  ${status} ${result.brand.padEnd(20)} found=${result.found} unique=${result.unique} submitted=${result.submitted}`);
+    if (result.error) errors++;
+    totalFound += result.found;
+    totalSubmitted += result.submitted;
+    return result;
+  }));
+
+  const settled = await Promise.allSettled(tasks);
+  for (const r of settled) {
+    if (r.status === 'rejected') {
       errors++;
-      console.error(`  Error: ${r.reason?.message || r.reason}`);
+      console.error(`  ✗ Error: ${r.reason?.message || r.reason}`);
     }
   }
 
-  console.log(`\nDone. ${total} offers discovered across ${brands.length} brands (${errors} errors).`);
+  console.log(`\nDone. Found: ${totalFound}, Submitted: ${totalSubmitted}, Errors: ${errors}`);
   await close();
 }
 
@@ -154,10 +192,12 @@ export async function processQueue() {
     return;
   }
 
-  const { brandId, brandName } = job;
-  console.log(`Processing queued: ${brandName || brandId}`);
+  const { brandId } = job;
+  console.log(`Processing queued: ${brandId}`);
 
-  const brand = await db.collection('brands').findOne({ _id: new (await import('mongodb')).ObjectId(brandId) });
+  const { ObjectId } = await import('mongodb');
+  const brand = await db.collection('brands').findOne({ _id: new ObjectId(brandId) });
+
   if (!brand) {
     await queue.updateOne({ _id: job._id }, { $set: { status: 'failed', error: 'Brand not found' } });
     await close();
@@ -170,7 +210,7 @@ export async function processQueue() {
     { $set: { status: 'done', result, completedAt: new Date() } }
   );
 
-  console.log(`Done: ${result.submitted} offers.`);
+  console.log(`Done: ${result.submitted} offers submitted.`);
   await close();
 }
 
