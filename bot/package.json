@@ -3,17 +3,14 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
-    "discover": "node index.js --discover",
-    "verify": "node index.js --verify",
-    "discover:brand": "node index.js --brand"
+    "discover": "node standalone.js --brands",
+    "stale": "node standalone.js --stale",
+    "queue": "node standalone.js --queue"
   },
   "dependencies": {
-    "bullmq": "^5.12.0",
     "cheerio": "^1.0.0",
     "dotenv": "^16.4.5",
-    "ioredis": "^5.4.1",
-    "mongodb": "^7.5.0",
+    "mongodb": "^6.3.0",
     "node-fetch": "^3.3.2",
     "p-limit": "^6.1.0"
   }

@@ -66,15 +66,29 @@ async function processBrand(db, brand) {
     submitted++;
   }
 
+  await db.collection('brands').updateOne(
+    { _id: brand._id },
+    { $set: { lastChecked: now } }
+  );
+
   return { brand: brand.name, offers: results.length, submitted };
 }
 
-export async function discoverAllBrands({ maxBrands } = {}) {
+export async function discoverAllBrands({ maxBrands, staleHours } = {}) {
   const db = await connect();
   const filter = { active: true };
+
+  if (staleHours) {
+    const cutoff = new Date(Date.now() - staleHours * 60 * 60 * 1000);
+    filter.$or = [
+      { lastChecked: { $lt: cutoff } },
+      { lastChecked: { $eq: null } },
+    ];
+  }
+
   const brands = await db.collection('brands')
     .find(filter)
-    .sort({ name: 1 })
+    .sort({ lastChecked: 1, name: 1 })
     .limit(maxBrands || 1000)
     .toArray();
 
@@ -141,6 +155,8 @@ export async function processQueue() {
 const args = process.argv.slice(2);
 if (args.includes('--queue')) {
   processQueue();
+} else if (args.includes('--stale')) {
+  discoverAllBrands({ staleHours: 24 });
 } else if (args.includes('--brands')) {
   const max = args.includes('--max') ? parseInt(args[args.indexOf('--max') + 1]) : undefined;
   discoverAllBrands({ maxBrands: max });
@@ -149,6 +165,7 @@ if (args.includes('--queue')) {
 Usage:
   node standalone.js --brands              Discover all active brands
   node standalone.js --brands --max 10     Discover first 10 brands
+  node standalone.js --stale               Discover brands not checked in 24h
   node standalone.js --queue               Process 1 queued job
 `);
 }

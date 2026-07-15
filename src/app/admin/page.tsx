@@ -260,6 +260,11 @@ function OffersTab({ onMsg }: { onMsg: (s: string) => void }) {
               <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>
                 {o.discount} · {Array.isArray(o.type) ? o.type.join(', ') : o.type} · {o.countries?.join(', ') || 'Global'}
               </p>
+              <a href={o.sourceUrl} target="_blank" rel="noopener noreferrer"
+                className="text-[10px] underline truncate block" style={{ color: '#22c55e' }}>
+                {o.sourceUrl}
+              </a>
+              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>via {o.sourceReliability || 'Bot'} · {o.sourcePage}</span>
             </div>
             <div className="flex shrink-0 items-center gap-1.5 ml-3">
               {o.status !== 'published' && <button onClick={() => handleOfferAction(o._id, 'published')} className="rounded-md px-2 py-1 text-[10px] font-medium border hover:bg-green-500/10" style={{ borderColor: 'var(--border)', color: '#22c55e' }}>Publish</button>}
