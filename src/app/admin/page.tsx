@@ -120,6 +120,16 @@ function BrandsTab({ onMsg }: { onMsg: (s: string) => void }) {
 
   useEffect(() => { loadBrands(page, search); }, [page]);
 
+  const triggerDiscover = async (brandId: string, name: string) => {
+    onMsg(`Queued: ${name}`);
+    // In production, this would call the bot API
+    await window.fetch('/api/bot/discover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brandId }),
+    });
+  };
+
   return (
     <div className="mt-6">
       <div className="flex gap-2 mb-4">
@@ -140,6 +150,11 @@ function BrandsTab({ onMsg }: { onMsg: (s: string) => void }) {
                 Discovery: {b.discovery?.enabled ? 'On' : 'Off'} · Crawl delay: {b.discovery?.crawlDelay || 3000}ms
               </p>
             </div>
+            <button onClick={() => triggerDiscover(b._id, b.name)}
+              className="rounded-md px-2 py-1 text-[10px] font-medium border shrink-0 ml-3 hover:bg-brand-500/10"
+              style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>
+              Discover
+            </button>
           </div>
         ))}
       </div>
