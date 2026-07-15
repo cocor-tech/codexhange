@@ -4,6 +4,7 @@ import { discoverByUrlPatterns } from './strategies/urlPatterns.js';
 import { discoverBySitemap } from './strategies/sitemap.js';
 import { scanHomepage } from './strategies/homepage.js';
 import { searchDeals } from './strategies/searchDork.js';
+import { discoverByLinks } from './strategies/linkDiscovery.js';
 import pLimit from 'p-limit';
 
 let discoverWithPlaywright;
@@ -34,6 +35,7 @@ async function processBrand(db, brand) {
     discoverBySitemap({ brandId: id, brandName: brand.name, website: brand.website }),
     scanHomepage({ brandName: brand.name, website: brand.website }),
     searchDeals({ brandName: brand.name, website: brand.website }),
+    discoverByLinks({ brandName: brand.name, website: brand.website }),
   ];
 
   // Add Playwright if available (for JS-heavy sites)

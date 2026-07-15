@@ -2,12 +2,117 @@ import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 
 const PATTERNS = [
-  '/coupons', '/promo', '/promo-codes', '/discount', '/deals',
-  '/offers', '/special-offers', '/promotions', '/sale',
-  '/coupon-codes', '/voucher', '/vouchers', '/promo-code',
-  '/student-discount', '/referral', '/referral-program',
-  '/black-friday', '/cyber-monday', '/holiday-sale',
-  '/pricing', '/plans', '/subscription',
+  // === STANDARD DEAL PAGES ===
+  '/coupons', '/promo', '/promo-codes', '/promo-code', '/discount',
+  '/deals', '/offers', '/special-offers', '/promotions', '/sale',
+  '/coupon-codes', '/coupon', '/voucher', '/vouchers',
+  '/promotions', '/special-deals', '/hot-deals', '/daily-deals',
+
+  // === NEW CUSTOMER / WELCOME / FIRST ORDER ===
+  '/new-customer', '/newcustomer', '/welcome', '/welcome-offer',
+  '/first-order', '/firstorder', '/first-purchase', '/firstpurchase',
+  '/signup-offer', '/sign-up', '/signup-bonus', '/join',
+  '/get-started', '/getstarted', '/start-free', '/startfree',
+  '/try-free', '/tryfree', '/free-trial', '/freetrial',
+
+  // === STUDENT / TEACHER / MILITARY ===
+  '/student', '/student-discount', '/students', '/student-deals',
+  '/education', '/teacher-discount', '/teachers',
+  '/military-discount', '/veterans', '/first-responder',
+  '/nonprofit', '/nonprofit-discount', '/charity',
+
+  // === REFERRAL / REWARDS / LOYALTY ===
+  '/refer', '/referral', '/refer-a-friend', '/referfriend',
+  '/invite', '/rewards', '/loyalty', '/loyalty-program',
+  '/cashback', '/cash-back', '/reward', '/reward-program',
+  '/points', '/membership', '/membership-benefits',
+  '/gift-card', '/giftcard', '/gift-cards', '/egift',
+
+  // === SEASONAL / FLASH / HOLIDAY ===
+  '/black-friday', '/cyber-monday', '/holiday-sale', '/holiday',
+  '/christmas-sale', '/new-year-sale', '/valentines',
+  '/summer-sale', '/spring-sale', '/fall-sale',
+  '/flash-sale', '/flashsale', '/daily-deal', '/deal-of-day',
+  '/today-deal', '/clearance', '/outlet', '/clearance-sale',
+
+  // === BLOG / NEWS / SOCIAL ===
+  '/blog/deals', '/blog/coupons', '/blog/promotions',
+  '/blog/discount', '/blog/sale', '/news/deals',
+  '/news/promotions', '/press/deals',
+
+  // === AFFILIATE / PARTNERSHIP ===
+  '/affiliate', '/affiliates', '/partner', '/partners',
+  '/affiliate-program', '/partnership',
+
+  // === BILLING / PRICING / SUBSCRIPTION ===
+  '/pricing', '/plans', '/subscription', '/subscribe',
+  '/billing', '/membership-plans', '/pricing-plans',
+  '/enterprise', '/business-pricing',
+
+  // === SUPPORT / HELP CENTER ===
+  '/help/coupons', '/help/promotions', '/help/discounts',
+  '/faq/coupons', '/faq/discounts', '/faq/promotions',
+  '/support/coupons', '/support/promotions',
+
+  // === RESELLER / WHOLESALE ===
+  '/reseller', '/wholesale', '/bulk', '/bulk-pricing',
+  '/volume-discount', '/enterprise-deals',
+
+  // === MOBILE APP ===
+  '/app-exclusive', '/app-only', '/mobile-offer',
+  '/app-download', '/mobile-app',
+
+  // === NEWSLETTER / EMAIL ===
+  '/newsletter', '/newsletter-signup', '/email-offer',
+  '/email-signup', '/subscribe-offer',
+
+  // === GUARANTEE / PRICE MATCH ===
+  '/price-match', '/price-guarantee', '/low-price-guarantee',
+  '/best-price-guarantee', '/satisfaction-guaranteed',
+
+  // === FREE STUFF ===
+  '/free', '/freebies', '/free-stuff', '/free-download',
+  '/free-shipping', '/free-trial-offer',
+  '/free-domain', '/free-ssl', '/free-email',
+  '/free-migration', '/free-transfer',
+
+  // === BUNDLE / PACKAGE ===
+  '/bundle', '/bundles', '/package-deals', '/combos',
+  '/value-packs', '/package-offers',
+
+  // === SPECIFIC BRAND PATTERNS (real examples from sites) ===
+  // Namecheap
+  '/promos', '/promos/coupons',
+  // Temu
+  '/m/login', '/m/referral',
+  // Amazon
+  '/coupons', '/goldbox', '/deals', '/gcx/GiftCards',
+  // AliExpress
+  '/promotions', '/spree', '/campaign',
+  // eBay
+  '/coupons', '/deals',
+  // Best Buy
+  '/deal-of-the-day', '/sale-event',
+  // Nike
+  '/launch', '/member-offers',
+  // Booking.com
+  '/deals', '/genius',
+  // Airbnb
+  '/referral', '/invite',
+  // DoorDash
+  '/promo', '/dashpass',
+  // Uber
+  '/promo', '/rides/promotions',
+  // Spotify
+  '/premium', '/student',
+  // HelloFresh
+  '/promo', '/student',
+  // Canva
+  '/pro', '/education',
+  // NordVPN
+  '/special', '/deal',
+  // Adobe
+  '/creativecloud/plans', '/student',
 ];
 
 const KEYWORDS = [
