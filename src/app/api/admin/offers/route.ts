@@ -7,12 +7,19 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
+  const offerId = searchParams.get('offerId');
   const serviceId = searchParams.get('serviceId');
   const status = searchParams.get('status');
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '50');
 
   await connectDB();
+
+  // Single offer lookup
+  if (offerId) {
+    const offer = await Offer.findById(offerId).lean();
+    return NextResponse.json({ offers: offer ? [offer] : [] });
+  }
 
   const filter: any = {};
   if (serviceId) filter.serviceId = serviceId;

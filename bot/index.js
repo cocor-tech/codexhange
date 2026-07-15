@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { addBatchDiscovery, addDiscoveryJob } from './queue.js';
 
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:3000';
@@ -36,18 +37,26 @@ async function discoverAll() {
   process.exit(0);
 }
 
-async function discoverSingle(brandId, brandName, website) {
-  console.log(`Queuing single brand: ${brandName}`);
-  await addDiscoveryJob(brandId, brandName, website);
-  console.log('Done.');
-  process.exit(0);
-}
-
-// CLI: node index.js              (discover all)
-// CLI: node index.js <brandId> <name> <website>  (discover single)
 const args = process.argv.slice(2);
-if (args.length >= 3) {
-  discoverSingle(args[0], args[1], args[2]);
-} else {
+if (args.includes('--discover')) {
   discoverAll();
+} else if (args.includes('--brand')) {
+  const id = args[args.indexOf('--id') + 1];
+  const name = args[args.indexOf('--name') + 1];
+  const url = args[args.indexOf('--url') + 1];
+  if (id && name && url) {
+    addDiscoveryJob(id, name, url).then(() => process.exit(0));
+  } else {
+    console.error('Missing --id, --name, or --url');
+    process.exit(1);
+  }
+} else {
+  console.log(`
+Usage:
+  node index.js --discover                    Queue all active brands
+  node index.js --brand --id <id> --name <n> --url <u>  Queue single brand
+  node workers/discovery.js                   Start discovery worker
+  node workers/verify.js                      Start verification worker
+`);
+  process.exit(1);
 }

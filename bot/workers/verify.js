@@ -1,4 +1,6 @@
+import 'dotenv/config';
 import { createVerificationWorker } from '../queue.js';
+import fetch from 'node-fetch';
 
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:3000';
 
@@ -6,12 +8,20 @@ const worker = createVerificationWorker(async (job) => {
   const { offerId } = job.data;
   console.log(`[Verify] ${offerId}`);
 
-  const res = await fetch(`${API_BASE}/api/admin/offers?offerId=${offerId}`);
-  if (!res.ok) return { offerId, status: 'not_found' };
-  const data = await res.json();
-  const offer = data.offers?.[0];
-  if (!offer) return { offerId, status: 'not_found' };
+  // Fetch single offer
+  let offer;
+  try {
+    const res = await fetch(`${API_BASE}/api/admin/offers?offerId=${offerId}`);
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    const data = await res.json();
+    offer = data.offers?.[0];
+    if (!offer) throw new Error('Not found');
+  } catch (err) {
+    console.error(`  Fetch failed: ${err.message}`);
+    return { offerId, status: 'not_found' };
+  }
 
+  // Check if source URL still exists
   let exists = false;
   try {
     const head = await fetch(offer.sourceUrl, {
@@ -21,21 +31,35 @@ const worker = createVerificationWorker(async (job) => {
       redirect: 'follow',
     });
     exists = head.ok;
-  } catch { exists = false; }
+  } catch {
+    exists = false;
+  }
 
   let newStatus = offer.status;
   if (!exists && offer.status === 'published') newStatus = 'expired';
   else if (exists && offer.status === 'expired') newStatus = 'published';
 
   if (newStatus !== offer.status) {
-    await fetch(`${API_BASE}/api/admin/offers`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ offerId, status: newStatus, verifiedAt: new Date().toISOString() }),
-    });
-    console.log(`  ${offerId}: ${offer.status} → ${newStatus}`);
+    try {
+      await fetch(`${API_BASE}/api/admin/offers`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offerId, status: newStatus, verifiedAt: new Date().toISOString() }),
+      });
+      console.log(`  ${offerId}: ${offer.status} → ${newStatus}`);
+    } catch (err) {
+      console.error(`  Update failed: ${err.message}`);
+    }
   } else {
-    console.log(`  ${offerId}: unchanged (${offer.status})`);
+    // Still update verifiedAt to keep freshness
+    try {
+      await fetch(`${API_BASE}/api/admin/offers`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offerId, verifiedAt: new Date().toISOString() }),
+      });
+    } catch {}
+    console.log(`  ${offerId}: unchanged (${offer.status}), verifiedAt refreshed`);
   }
 
   return { offerId, previousStatus: offer.status, newStatus };

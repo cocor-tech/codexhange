@@ -10,92 +10,71 @@ const PATTERNS = [
   '/pricing', '/plans', '/subscription',
 ];
 
-const COUPON_KEYWORDS = [
+const KEYWORDS = [
   'coupon', 'promo code', 'promo', 'discount', 'deal', 'offer',
   'save', 'sale', 'voucher', 'referral', 'refer', 'bonus',
   'free trial', 'free shipping', 'student', 'first order',
 ];
 
-const USER_AGENTS = [
+const UAs = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0',
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0',
 ];
 
-function randomUA() {
-  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
-}
-
-function extractText($, selector) {
-  const el = $(selector);
-  return el.length ? el.text().trim() : null;
-}
+function ua() { return UAs[Math.floor(Math.random() * UAs.length)]; }
 
 export async function discoverByUrlPatterns(brand) {
-  const { brandId, brandName, website } = brand;
-  const baseUrl = website.replace(/\/$/, '');
+  const { brandName, website } = brand;
+  const base = website.replace(/\/$/, '');
   const results = [];
 
   for (const pattern of PATTERNS) {
-    const url = `${baseUrl}${pattern}`;
+    const url = `${base}${pattern}`;
     try {
       const res = await fetch(url, {
-        headers: { 'User-Agent': randomUA() },
+        headers: { 'User-Agent': ua() },
         redirect: 'follow',
         follow: 3,
-        timeout: 10000,
+        timeout: 8000,
       });
-
       if (!res.ok) continue;
 
       const html = await res.text();
       const $ = cheerio.load(html);
-      const pageText = $('body').text().toLowerCase();
+      const text = $('body').text().toLowerCase();
 
-      const matchedKeywords = COUPON_KEYWORDS.filter(kw => pageText.includes(kw));
-      if (matchedKeywords.length < 2) continue;
+      const matched = KEYWORDS.filter(kw => text.includes(kw));
+      if (matched.length < 2) continue;
 
-      const title = $('title').text().trim() || `${brandName} ${pattern}`;
-      const metaDesc = $('meta[name="description"]').attr('content') || '';
-
-      const offerTitles = [];
-      $('h1, h2, h3').each((_, el) => {
-        const text = $(el).text().trim();
-        if (COUPON_KEYWORDS.some(kw => text.toLowerCase().includes(kw))) {
-          offerTitles.push(text);
-        }
-      });
-
-      const discountTexts = [];
-      $('[class*="discount"], [class*="price"], [class*="sale"], [class*="offer"]').each((_, el) => {
-        const text = $(el).text().trim();
-        if (text.length > 1 && text.length < 100) discountTexts.push(text);
-      });
+      const title = ($('title').text().trim() || `${brandName} ${pattern}`).slice(0, 200);
+      const desc = ($('meta[name="description"]').attr('content') || '').slice(0, 500);
 
       const codes = [];
       $('code, [class*="code"], [class*="coupon"]').each((_, el) => {
-        const text = $(el).text().trim();
-        if (text.length > 3 && text.length < 30 && /[A-Z0-9]{4,}/i.test(text)) {
-          codes.push(text);
-        }
+        const t = $(el).text().trim();
+        if (t.length > 3 && t.length < 30 && /[A-Z0-9]{4,}/i.test(t)) codes.push(t);
       });
 
-      const discountMatch = pageText.match(/(\d+%)/);
-      const priceMatch = pageText.match(/\$(\d+)\s*off/i);
+      const pct = text.match(/(\d+%)\s*off/i);
+      const dollars = text.match(/\$(\d+)\s*off/i);
+
+      // Duplicate check by normalized URL
+      const norm = url.replace(/\/$/, '').toLowerCase();
+      if (results.some(r => r.sourceUrl.replace(/\/$/, '').toLowerCase() === norm)) continue;
 
       results.push({
         sourceUrl: url,
         sourcePage: pattern,
         sourceReliability: 'Official Site',
-        confidence: Math.min(50 + matchedKeywords.length * 8, 98),
-        title: title.slice(0, 200),
-        description: metaDesc.slice(0, 500),
-        discount: discountMatch?.[1] || priceMatch?.[0] || 'Special offer',
-        matchedKeywords: matchedKeywords.length,
+        confidence: Math.min(50 + matched.length * 8, 98),
+        title,
+        description: desc,
+        discount: pct?.[0] || dollars?.[0] || 'Special offer',
         codes: [...new Set(codes)],
       });
     } catch {
-      continue;
+      // Timeout or network error — skip silently
     }
   }
 
