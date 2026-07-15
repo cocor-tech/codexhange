@@ -1,8 +1,14 @@
-let playwright;
+let playwright, stealth;
 try {
-  playwright = await import('playwright');
+  playwright = await import('playwright-extra');
+  stealth = (await import('puppeteer-extra-plugin-stealth')).default();
+  playwright.use(stealth);
 } catch {
-  console.log('  Playwright not available, skipping JS strategy');
+  try {
+    playwright = await import('playwright');
+  } catch {
+    // Not available
+  }
 }
 
 const PATTERNS = [
@@ -10,12 +16,20 @@ const PATTERNS = [
   '/offers', '/special-offers', '/promotions', '/sale',
   '/coupon-codes', '/voucher', '/vouchers', '/promo-code',
   '/referral', '/referral-program', '/pricing', '/plans',
+  '/student-discount', '/new-customer', '/welcome',
+  '/signup-offer', '/m/login', '/m/referral',
+];
+
+const KEYWORDS = [
+  'coupon', 'promo code', 'promo', 'discount', 'deal', 'offer',
+  'save', 'sale', 'voucher', 'referral', 'bonus', 'free trial',
 ];
 
 const CODE_PATTERNS = [
-  /\b[A-Z0-9]{4,20}\b/g,
-  /(?:code|coupon|promo)[:\s]+([A-Z0-9]{4,20})/gi,
-  /(?:use|enter|apply)\s+code[:\s]+([A-Z0-9]{4,20})/gi,
+  /(?:code|coupon|promo)[:\s]+([A-Z0-9_\-]{4,25})/gi,
+  /(?:use|enter|apply)\s+(?:code\s+)?["']?([A-Z0-9_\-]{4,25})["']?/gi,
+  /\b([A-Z0-9]{4,20})\b(?=.*(?:off|save|discount|free))/gi,
+  /["']([A-Z0-9_\-]{4,25})["']/g,
 ];
 
 function extractCodes(text) {
@@ -23,7 +37,8 @@ function extractCodes(text) {
   for (const p of CODE_PATTERNS) {
     for (const m of text.matchAll(p)) {
       const code = (m[1] || m[0]).trim();
-      if (code.length >= 4 && code.length <= 20 && /[A-Z0-9]{4,}/i.test(code)) {
+      if (code.length >= 4 && code.length <= 25 && /[A-Z0-9]{3,}/i.test(code)) {
+        if (/^\d+$/.test(code) && code.length < 6) continue;
         found.add(code.toUpperCase());
       }
     }
@@ -36,17 +51,10 @@ const DISCOUNT_PATTERNS = [
   /free\s+(trial|shipping|delivery)/i, /up\s+to\s+(\d+%)/i,
 ];
 
-function extractDiscount(text) {
-  for (const p of DISCOUNT_PATTERNS) {
-    const m = text.match(p);
-    if (m) return m[0];
-  }
-  return null;
-}
-
-const KEYWORDS = [
-  'coupon', 'promo code', 'promo', 'discount', 'deal', 'offer',
-  'save', 'sale', 'voucher', 'referral', 'bonus', 'free trial',
+const USER_AGENTS = [
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36',
+  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126.0.0.0 Safari/537.36',
 ];
 
 export async function discoverWithPlaywright(brand) {
@@ -58,28 +66,59 @@ export async function discoverWithPlaywright(brand) {
   let browser;
 
   try {
-    browser = await playwright.chromium.launch({ headless: true });
-    const context = await browser.newContext({
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0',
+    browser = await playwright.chromium.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-web-security',
+        '--disable-features=IsolateOrigins,site-per-process',
+      ],
+    });
+
+    const ua = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+    const ctx = await browser.newContext({
+      userAgent: ua,
+      viewport: { width: 1920, height: 1080 },
+      locale: 'en-US',
+      timezoneId: 'America/New_York',
+      permissions: [],
+    });
+
+    // Override navigator.webdriver
+    await ctx.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+      // Mock chrome object
+      window.chrome = { runtime: {} };
     });
 
     for (const pattern of PATTERNS) {
       const url = `${base}${pattern}`;
       try {
-        const page = await context.newPage();
+        const page = await ctx.newPage();
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
 
-        const text = await page.evaluate(() => document.body.innerText.toLowerCase());
-        const title = await page.evaluate(() => {
-          const h1 = document.querySelector('h1');
-          return (h1?.innerText || document.title)?.trim() || '';
-        });
+        // Wait a moment for dynamic content
+        await page.waitForTimeout(2000);
 
-        const matched = KEYWORDS.filter(kw => text.includes(kw));
-        if (matched.length < 2) { await page.close(); continue; }
+        const text = await page.evaluate(() => document.body.innerText);
 
+        // Check if cloudflare blocked us
+        if (text.includes('Just a moment') || text.includes('Checking your browser')) {
+          await page.close();
+          continue;
+        }
+
+        const lower = text.toLowerCase();
+        const matched = KEYWORDS.filter(kw => lower.includes(kw));
+        if (matched.length < 2 && !extractCodes(text).length) {
+          await page.close();
+          continue;
+        }
+
+        const title = await page.title();
         const codes = extractCodes(text);
-        const discount = extractDiscount(text);
+        const discount = DISCOUNT_PATTERNS.map(p => text.match(p)).find(Boolean)?.[0] || null;
         const desc = await page.evaluate(() =>
           document.querySelector('meta[name="description"]')?.getAttribute('content') || ''
         );
@@ -90,7 +129,7 @@ export async function discoverWithPlaywright(brand) {
 
         results.push({
           sourceUrl: url,
-          sourcePage: pattern,
+          sourcePage: 'pw-' + pattern.replace('/', ''),
           sourceReliability: 'Official Site',
           confidence,
           title: (title || `${brandName} ${pattern}`).slice(0, 200),
@@ -101,9 +140,11 @@ export async function discoverWithPlaywright(brand) {
 
         await page.close();
       } catch {
-        // Skip pages that fail to load
+        // Skip
       }
     }
+
+    await ctx.close();
   } catch (err) {
     console.error('  Playwright error:', err.message);
   } finally {
