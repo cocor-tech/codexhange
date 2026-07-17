@@ -6,6 +6,7 @@ export interface IUser extends Document {
   emailVerified?: Date;
   image?: string;
   isAdmin: boolean;
+  passwordHash?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -17,6 +18,7 @@ const UserSchema = new Schema<IUser>(
     emailVerified: { type: Date },
     image: { type: String },
     isAdmin: { type: Boolean, default: false },
+    passwordHash: { type: String, select: false },
   },
   { timestamps: true }
 );

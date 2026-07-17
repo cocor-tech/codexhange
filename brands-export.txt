@@ -1,0 +1,547 @@
+# Codexhange Brands
+# Exported: 2026-07-16
+# Total: 543
+
+Namecheap|https://www.namecheap.com
+Porkbun|https://porkbun.com
+Dynadot|https://www.dynadot.com
+Spaceship|https://www.spaceship.com
+GoDaddy|https://www.godaddy.com
+Name.com|https://www.name.com
+NameSilo|https://www.namesilo.com
+Hover|https://www.hover.com
+IONOS|https://www.ionos.com
+Hostinger|https://www.hostinger.com
+Bluehost|https://www.bluehost.com
+DreamHost|https://www.dreamhost.com
+Network Solutions|https://www.networksolutions.com
+Register.com|https://www.register.com
+Gandi|https://www.gandi.net
+OVHcloud|https://www.ovhcloud.com
+Internet.bs|https://internet.bs
+EuroDNS|https://www.eurodns.com
+Domain.com|https://www.domain.com
+Dotster|https://www.dotster.com
+HostGator|https://www.hostgator.com
+ScalaHosting|https://www.scalahosting.com
+Crazy Domains|https://www.crazydomains.com
+OnlyDomains|https://www.onlydomains.com
+Names.co.uk|https://www.names.co.uk
+Domain Discount24|https://www.domaindiscount24.com
+Moniker|https://www.moniker.com
+Pair Domains|https://www.pairdomains.com
+Openprovider|https://www.openprovider.com
+one.com|https://www.one.com
+HostPapa|https://www.hostpapa.com
+Webnames.ca|https://www.webnames.ca
+Joker.com|https://joker.com
+BookMyName|https://www.bookmyname.com
+INWX|https://www.inwx.com
+iwantmyname|https://iwantmyname.com
+Marcaria|https://www.marcaria.com
+Hexonet|https://hexonet.net
+Easyspace|https://www.easyspace.com
+Fasthosts|https://www.fasthosts.co.uk
+BigRock|https://www.bigrock.com
+ResellerClub|https://www.resellerclub.com
+Netim|https://www.netim.com
+101domain|https://www.101domain.com
+Cloud DNS|https://www.cloudns.net
+DomainCostClub|https://domaincostclub.com
+HostAfrica|https://hostafrica.com
+Register365|https://www.register365.com
+NIC.IO|https://nic.io
+Cloudflare Registrar|https://www.cloudflare.com/products/registrar/
+SiteGround|https://www.siteground.com
+A2 Hosting|https://www.a2hosting.com
+GreenGeeks|https://www.greengeeks.com
+InMotion Hosting|https://www.inmotionhosting.com
+Namecheap Hosting|https://www.namecheap.com/hosting/
+GoDaddy Hosting|https://www.godaddy.com
+InterServer|https://www.interserver.net
+FastComet|https://www.fastcomet.com
+Liquid Web|https://www.liquidweb.com
+WP Engine|https://wpengine.com
+Kinsta|https://kinsta.com
+Cloudways|https://www.cloudways.com
+Nexcess|https://www.nexcess.net
+ChemiCloud|https://chemicloud.com
+HostArmada|https://hostarmada.com
+AccuWeb Hosting|https://www.accuwebhosting.com
+WebHostingPad|https://www.webhostingpad.com
+iPage|https://www.ipage.com
+JustHost|https://www.justhost.com
+Hostwinds|https://www.hostwinds.com
+KnownHost|https://www.knownhost.com
+Hetzner|https://www.hetzner.com
+Contabo|https://contabo.com
+Krystal|https://krystal.io
+xneelo|https://xneelo.co.za
+MilesWeb|https://www.milesweb.com
+Verpex|https://verpex.com
+TMDHosting|https://www.tmdhosting.com
+Hosting.com|https://hosting.com
+Stablepoint|https://stablepoint.com
+Mochahost|https://www.mochahost.com
+Hostinger India|https://www.hostinger.in
+Web.com Hosting|https://www.web.com
+Arvixe|https://www.arvixe.com
+GlowHost|https://www.glowhost.com
+RoseHosting|https://www.rosehosting.com
+ServerMania|https://www.servermania.com
+Shock Hosting|https://shockhosting.net
+HostSailor|https://hostsailor.com
+GoogieHost|https://googiehost.com
+AwardSpace|https://www.awardspace.com
+Amazon Web Services (AWS)|https://aws.amazon.com
+Google Cloud|https://cloud.google.com
+Microsoft Azure|https://azure.microsoft.com
+Oracle Cloud|https://www.oracle.com/cloud
+IBM Cloud|https://www.ibm.com/cloud
+DigitalOcean|https://www.digitalocean.com
+Vultr|https://www.vultr.com
+Linode (Akamai Cloud)|https://www.linode.com
+Hetzner Cloud|https://www.hetzner.com/cloud
+Scaleway|https://www.scaleway.com
+UpCloud|https://upcloud.com
+Exoscale|https://www.exoscale.com
+Leaseweb|https://www.leaseweb.com
+Kamatera|https://www.kamatera.com
+Rackspace|https://www.rackspace.com
+Fly.io|https://fly.io
+Railway|https://railway.com
+Render|https://render.com
+Northflank|https://northflank.com
+Koyeb|https://www.koyeb.com
+Clever Cloud|https://www.clever-cloud.com
+Platform.sh|https://platform.sh
+Heroku|https://www.heroku.com
+Netlify|https://www.netlify.com
+Vercel|https://vercel.com
+Firebase|https://firebase.google.com
+Supabase|https://supabase.com
+Neon|https://neon.com
+PlanetScale|https://planetscale.com
+MongoDB Atlas|https://www.mongodb.com/atlas
+Cloudflare|https://www.cloudflare.com
+Wasabi|https://wasabi.com
+Backblaze B2|https://www.backblaze.com
+Bunny.net|https://bunny.net
+Akamai Cloud|https://www.akamai.com
+Tencent Cloud|https://www.tencentcloud.com
+Alibaba Cloud|https://www.alibabacloud.com
+Huawei Cloud|https://www.huaweicloud.com
+PhoenixNAP|https://phoenixnap.com
+Cherry Servers|https://www.cherryservers.com
+Servers.com|https://www.servers.com
+IONOS Cloud|https://cloud.ionos.com
+StormForge|https://stormforge.io
+Elastx|https://elastx.se
+Gcore|https://gcore.com
+CoreWeave|https://www.coreweave.com
+HostHatch|https://hosthatch.com
+Aruba Cloud|https://www.arubacloud.com
+ChatGPT|https://chatgpt.com
+Claude|https://claude.ai
+Gemini|https://gemini.google.com
+Perplexity|https://www.perplexity.ai
+Midjourney|https://www.midjourney.com
+Runway|https://runwayml.com
+ElevenLabs|https://elevenlabs.io
+Leonardo AI|https://leonardo.ai
+Ideogram|https://ideogram.ai
+Recraft|https://www.recraft.ai
+Canva AI|https://www.canva.com
+Adobe Firefly|https://firefly.adobe.com
+Gamma|https://gamma.app
+Tome|https://tome.app
+Notion AI|https://www.notion.so/product/ai
+Grammarly|https://www.grammarly.com
+QuillBot|https://quillbot.com
+Jasper|https://www.jasper.ai
+Copy.ai|https://www.copy.ai
+Writesonic|https://writesonic.com
+Rytr|https://rytr.me
+Anyword|https://anyword.com
+Wordtune|https://www.wordtune.com
+Sudowrite|https://www.sudowrite.com
+Frase|https://www.frase.io
+Surfer|https://surferseo.com
+Scalenut|https://www.scalenut.com
+Descript|https://www.descript.com
+Synthesia|https://www.synthesia.io
+HeyGen|https://www.heygen.com
+VEED AI|https://www.veed.io
+Pictory|https://pictory.ai
+InVideo AI|https://invideo.io
+Kapwing|https://www.kapwing.com
+Luma AI|https://lumalabs.ai
+Kling AI|https://klingai.com
+Pixlr|https://pixlr.com
+Fotor AI|https://www.fotor.com
+PhotoRoom|https://www.photoroom.com
+Remove.bg|https://www.remove.bg
+Cleanup.pictures|https://cleanup.pictures
+Cursor|https://cursor.com
+Windsurf|https://windsurf.com
+Replit|https://replit.com
+Bolt|https://bolt.new
+Lovable|https://lovable.dev
+v0|https://v0.dev
+GitHub Copilot|https://github.com/features/copilot
+Codeium|https://codeium.com
+Tabnine|https://www.tabnine.com
+GitHub|https://github.com
+GitLab|https://gitlab.com
+Bitbucket|https://bitbucket.org
+Postman|https://www.postman.com
+Insomnia|https://insomnia.rest
+Docker|https://www.docker.com
+JetBrains|https://www.jetbrains.com
+Visual Studio|https://visualstudio.microsoft.com
+Sublime Text|https://www.sublimetext.com
+BBEdit|https://www.barebones.com/products/bbedit
+Warp|https://www.warp.dev
+GitKraken|https://www.gitkraken.com
+Sentry|https://sentry.io
+Datadog|https://www.datadoghq.com
+New Relic|https://newrelic.com
+LogRocket|https://logrocket.com
+LaunchDarkly|https://launchdarkly.com
+CircleCI|https://circleci.com
+Travis CI|https://www.travis-ci.com
+Semaphore CI|https://semaphoreci.com
+SonarQube|https://www.sonarsource.com
+SonarCloud|https://sonarcloud.io
+Codacy|https://www.codacy.com
+Code Climate|https://codeclimate.com
+BrowserStack|https://www.browserstack.com
+LambdaTest|https://www.lambdatest.com
+Sauce Labs|https://saucelabs.com
+TestRail|https://www.testrail.com
+Jira|https://www.atlassian.com/software/jira
+Confluence|https://www.atlassian.com/software/confluence
+Trello|https://trello.com
+ClickUp|https://clickup.com
+Asana|https://asana.com
+Monday.com|https://monday.com
+Linear|https://linear.app
+Shortcut|https://shortcut.com
+Airtable|https://www.airtable.com
+Retool|https://retool.com
+Appsmith|https://www.appsmith.com
+Budibase|https://budibase.com
+Prisma|https://www.prisma.io
+Redis|https://redis.io
+Elastic|https://www.elastic.co
+HashiCorp|https://www.hashicorp.com
+Auth0|https://auth0.com
+Clerk|https://clerk.com
+WorkOS|https://workos.com
+Amazon|https://www.amazon.com
+eBay|https://www.ebay.com
+AliExpress|https://www.aliexpress.com
+Temu|https://www.temu.com
+Etsy|https://www.etsy.com
+Walmart|https://www.walmart.com
+Target|https://www.target.com
+Best Buy|https://www.bestbuy.com
+Costco|https://www.costco.com
+Sam's Club|https://www.samsclub.com
+Newegg|https://www.newegg.com
+Rakuten|https://www.rakuten.com
+Overstock (Bed Bath & Beyond)|https://www.bedbathandbeyond.com
+Mercado Libre|https://www.mercadolibre.com
+Noon|https://www.noon.com
+Jumia|https://www.jumia.com
+Konga|https://www.konga.com
+Flipkart|https://www.flipkart.com
+Lazada|https://www.lazada.com
+Shopee|https://shopee.com
+SHEIN|https://www.shein.com
+ASOS|https://www.asos.com
+Zara|https://www.zara.com
+H&M|https://www.hm.com
+Uniqlo|https://www.uniqlo.com
+Nike|https://www.nike.com
+Adidas|https://www.adidas.com
+Puma|https://www.puma.com
+New Balance|https://www.newbalance.com
+Under Armour|https://www.underarmour.com
+Levi's|https://www.levi.com
+Converse|https://www.converse.com
+Vans|https://www.vans.com
+Foot Locker|https://www.footlocker.com
+StockX|https://stockx.com
+GOAT|https://www.goat.com
+Farfetch|https://www.farfetch.com
+SSENSE|https://www.ssense.com
+Boohoo|https://www.boohoo.com
+PrettyLittleThing|https://www.prettylittlething.com
+Apple|https://www.apple.com
+Samsung|https://www.samsung.com
+Dell|https://www.dell.com
+HP|https://www.hp.com
+Lenovo|https://www.lenovo.com
+ASUS|https://www.asus.com
+Acer|https://www.acer.com
+MSI|https://www.msi.com
+Razer|https://www.razer.com
+Logitech|https://www.logitech.com
+Corsair|https://www.corsair.com
+Anker|https://www.anker.com
+JBL|https://www.jbl.com
+Sony|https://www.sony.com
+Bose|https://www.bose.com
+Xiaomi|https://www.mi.com
+OnePlus|https://www.oneplus.com
+DJI|https://www.dji.com
+B&H Photo|https://www.bhphotovideo.com
+Micro Center|https://www.microcenter.com
+Sephora|https://www.sephora.com
+Ulta Beauty|https://www.ulta.com
+MAC Cosmetics|https://www.maccosmetics.com
+Fenty Beauty|https://fentybeauty.com
+L'Oréal|https://www.loreal.com
+Maybelline|https://www.maybelline.com
+NYX Professional Makeup|https://www.nyxcosmetics.com
+The Ordinary|https://theordinary.com
+e.l.f. Cosmetics|https://www.elfcosmetics.com
+Clinique|https://www.clinique.com
+IKEA|https://www.ikea.com
+Wayfair|https://www.wayfair.com
+Home Depot|https://www.homedepot.com
+Lowe's|https://www.lowes.com
+Ashley Furniture|https://www.ashleyfurniture.com
+West Elm|https://www.westelm.com
+Pottery Barn|https://www.potterybarn.com
+Crate & Barrel|https://www.crateandbarrel.com
+CB2|https://www.cb2.com
+Article|https://www.article.com
+Instacart|https://www.instacart.com
+Thrive Market|https://thrivemarket.com
+Kroger|https://www.kroger.com
+Whole Foods Market|https://www.wholefoodsmarket.com
+Tesco|https://www.tesco.com
+Carrefour|https://www.carrefour.com
+Aldi|https://www.aldi.com
+Lidl|https://www.lidl.com
+Sainsbury's|https://www.sainsburys.co.uk
+Ocado|https://www.ocado.com
+Chewy|https://www.chewy.com
+Petco|https://www.petco.com
+PetSmart|https://www.petsmart.com
+Zooplus|https://www.zooplus.com
+Pet Supplies Plus|https://www.petsuppliesplus.com
+Redbubble|https://www.redbubble.com
+Zazzle|https://www.zazzle.com
+Society6|https://society6.com
+Not On The High Street|https://www.notonthehighstreet.com
+Uncommon Goods|https://www.uncommongoods.com
+Booking.com|https://www.booking.com
+Expedia|https://www.expedia.com
+Agoda|https://www.agoda.com
+Hotels.com|https://www.hotels.com
+Priceline|https://www.priceline.com
+Kayak|https://www.kayak.com
+Skyscanner|https://www.skyscanner.net
+Trip.com|https://www.trip.com
+Travelocity|https://www.travelocity.com
+Orbitz|https://www.orbitz.com
+CheapOair|https://www.cheapoair.com
+Kiwi.com|https://www.kiwi.com
+Hopper|https://hopper.com
+Traveloka|https://www.traveloka.com
+eDreams|https://www.edreams.com
+Opodo|https://www.opodo.com
+Lastminute.com|https://www.lastminute.com
+Omio|https://www.omio.com
+Wotif|https://www.wotif.com
+Webjet|https://www.webjet.com
+Marriott|https://www.marriott.com
+Hilton|https://www.hilton.com
+Hyatt|https://www.hyatt.com
+IHG Hotels & Resorts|https://www.ihg.com
+Wyndham Hotels|https://www.wyndhamhotels.com
+Choice Hotels|https://www.choicehotels.com
+Best Western|https://www.bestwestern.com
+Radisson Hotels|https://www.radissonhotels.com
+Accor|https://all.accor.com
+Four Seasons|https://www.fourseasons.com
+Shangri-La Hotels|https://www.shangri-la.com
+Mandarin Oriental|https://www.mandarinoriental.com
+Kempinski|https://www.kempinski.com
+Omni Hotels|https://www.omnihotels.com
+Loews Hotels|https://www.loewshotels.com
+Premier Inn|https://www.premierinn.com
+Travelodge|https://www.travelodge.co.uk
+CitizenM|https://www.citizenm.com
+Motel 6|https://www.motel6.com
+OYO Rooms|https://www.oyorooms.com
+Hertz|https://www.hertz.com
+Enterprise|https://www.enterprise.com
+Avis|https://www.avis.com
+Budget|https://www.budget.com
+National Car Rental|https://www.nationalcar.com
+Alamo|https://www.alamo.com
+Sixt|https://www.sixt.com
+Europcar|https://www.europcar.com
+Dollar Car Rental|https://www.dollar.com
+Thrifty Car Rental|https://www.thrifty.com
+Airbnb|https://www.airbnb.com
+Vrbo|https://www.vrbo.com
+Plum Guide|https://www.plumguide.com
+Sonder|https://www.sonder.com
+Blueground|https://www.theblueground.com
+Homestay|https://www.homestay.com
+Vacasa|https://www.vacasa.com
+Cottages.com|https://www.cottages.com
+Holidu|https://www.holidu.com
+HomeToGo|https://www.hometogo.com
+GetYourGuide|https://www.getyourguide.com
+Viator|https://www.viator.com
+Klook|https://www.klook.com
+KKday|https://www.kkday.com
+Headout|https://www.headout.com
+Tiqets|https://www.tiqets.com
+CityPASS|https://www.citypass.com
+Go City|https://gocity.com
+TourRadar|https://www.tourradar.com
+Trafalgar|https://www.trafalgar.com
+Trainline|https://www.thetrainline.com
+Rail Europe|https://www.raileurope.com
+Eurail|https://www.eurail.com
+Busbud|https://www.busbud.com
+FlixBus|https://www.flixbus.com
+World Nomads|https://www.worldnomads.com
+SafetyWing|https://www.safetywing.com
+Allianz Travel Insurance|https://www.allianztravelinsurance.com
+InsureMyTrip|https://www.insuremytrip.com
+Priority Pass|https://www.prioritypass.com
+Uber Eats|https://www.ubereats.com
+DoorDash|https://www.doordash.com
+Grubhub|https://www.grubhub.com
+Deliveroo|https://deliveroo.com
+Just Eat|https://www.just-eat.com
+SkipTheDishes|https://www.skipthedishes.com
+Bolt Food|https://food.bolt.eu
+Glovo|https://glovoapp.com
+Foodpanda|https://www.foodpanda.com
+Zomato|https://www.zomato.com
+Swiggy|https://www.swiggy.com
+Talabat|https://www.talabat.com
+Careem Food|https://www.careem.com
+Wolt|https://wolt.com
+Menulog|https://www.menulog.com.au
+Delivery Hero|https://www.deliveryhero.com
+ChowNow|https://www.chownow.com
+Fantuan|https://www.fantuan.ca
+EatStreet|https://eatstreet.com
+Amazon Fresh|https://www.amazon.com/fresh
+Walmart Grocery|https://www.walmart.com/grocery
+FreshDirect|https://www.freshdirect.com
+Blinkit|https://blinkit.com
+Zepto|https://www.zeptonow.com
+McDonald's|https://www.mcdonalds.com
+Burger King|https://www.bk.com
+KFC|https://www.kfc.com
+Pizza Hut|https://www.pizzahut.com
+Domino's Pizza|https://www.dominos.com
+Papa Johns|https://www.papajohns.com
+Subway|https://www.subway.com
+Taco Bell|https://www.tacobell.com
+Chick-fil-A|https://www.chick-fil-a.com
+Wendy's|https://www.wendys.com
+Chipotle|https://www.chipotle.com
+Panera Bread|https://www.panerabread.com
+Popeyes|https://www.popeyes.com
+Five Guys|https://www.fiveguys.com
+Dunkin'|https://www.dunkindonuts.com
+Krispy Kreme|https://www.krispykreme.com
+Starbucks|https://www.starbucks.com
+Tim Hortons|https://www.timhortons.com
+Costa Coffee|https://www.costa.co.uk
+Cinnabon|https://www.cinnabon.com
+HelloFresh|https://www.hellofresh.com
+Blue Apron|https://www.blueapron.com
+EveryPlate|https://www.everyplate.com
+Green Chef|https://www.greenchef.com
+Home Chef|https://www.homechef.com
+Dinnerly|https://dinnerly.com
+Marley Spoon|https://marleyspoon.com
+Gousto|https://www.gousto.co.uk
+Purple Carrot|https://www.purplecarrot.com
+Sunbasket|https://sunbasket.com
+Chowdeck|https://chowdeck.com
+Heyfood|https://heyfood.africa
+Glovo Nigeria|https://glovoapp.com/ng
+OPay|https://www.opayweb.com
+PalmPay|https://palmpay.com
+Moniepoint|https://moniepoint.com
+Kuda|https://kuda.com
+Paga|https://www.mypaga.com
+Carbon|https://getcarbon.co
+FairMoney|https://fairmoney.io
+Branch|https://branchapp.com
+VBank|https://vbank.ng
+Eyowo|https://eyowo.com
+ALAT by Wema|https://alat.ng
+GTCO|https://gtbank.com
+Access Bank|https://accessbankplc.com
+Zenith Bank|https://zenithbank.com
+FirstBank Nigeria|https://firstbanknigeria.com
+UBA|https://ubagroup.com
+Sterling Bank|https://sterling.ng
+Fidelity Bank Nigeria|https://fidelitybank.ng
+FCMB|https://fcmb.com
+Stanbic IBTC|https://stanbicibtcbank.com
+PayPal|https://www.paypal.com
+Wise|https://wise.com
+Revolut|https://www.revolut.com
+Cash App|https://cash.app
+Venmo|https://venmo.com
+Zelle|https://www.zellepay.com
+Stripe|https://stripe.com
+Square|https://squareup.com
+Skrill|https://www.skrill.com
+Neteller|https://www.neteller.com
+Payoneer|https://www.payoneer.com
+WorldRemit|https://www.worldremit.com
+Remitly|https://www.remitly.com
+Western Union|https://www.westernunion.com
+MoneyGram|https://www.moneygram.com
+Xoom|https://www.xoom.com
+Paysend|https://paysend.com
+N26|https://n26.com
+Chime|https://www.chime.com
+Current|https://current.com
+Klarna|https://www.klarna.com
+Afterpay|https://www.afterpay.com
+Affirm|https://www.affirm.com
+Zip|https://zip.co
+Sezzle|https://sezzle.com
+PayBright|https://paybright.com
+Splitit|https://www.splitit.com
+Bread Financial|https://breadfinancial.com
+Uplift|https://www.uplift.com
+LatitudePay|https://latitudepay.com
+Binance|https://www.binance.com
+Coinbase|https://www.coinbase.com
+Kraken|https://www.kraken.com
+Bybit|https://www.bybit.com
+OKX|https://www.okx.com
+Bitget|https://www.bitget.com
+KuCoin|https://www.kucoin.com
+Crypto.com|https://crypto.com
+Gate.io|https://www.gate.io
+MEXC|https://www.mexc.com
+Flutterwave|https://flutterwave.com
+Paystack|https://paystack.com
+Monnify|https://monnify.com
+Lemon Squeezy|https://www.lemonsqueezy.com
+Paddle|https://www.paddle.com
+Adyen|https://www.adyen.com
+Checkout.com|https://www.checkout.com
+Razorpay|https://razorpay.com
+PayU|https://payu.com
+Mollie|https://www.mollie.com

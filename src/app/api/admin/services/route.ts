@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   if (brandId) filter.brandId = brandId;
 
   const [services, total] = await Promise.all([
-    Service.find(filter).sort({ name: 1 }).skip((page - 1) * limit).limit(limit).lean(),
+    Service.find(filter).sort({ name: 1 }).skip((page - 1) * limit).limit(limit).populate('brandId', 'name').lean(),
     Service.countDocuments(filter),
   ]);
 

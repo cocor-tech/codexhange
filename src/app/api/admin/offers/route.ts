@@ -26,7 +26,37 @@ export async function GET(req: NextRequest) {
   if (status) filter.status = status;
 
   const [offers, total] = await Promise.all([
-    Offer.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+    Offer.aggregate([
+      { $match: filter },
+      { $sort: { createdAt: -1 } },
+      { $skip: (page - 1) * limit },
+      { $limit: limit },
+      {
+        $lookup: {
+          from: 'services',
+          localField: 'serviceId',
+          foreignField: '_id',
+          as: 'service',
+        },
+      },
+      { $unwind: { path: '$service', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'brands',
+          localField: 'service.brandId',
+          foreignField: '_id',
+          as: 'brand',
+        },
+      },
+      { $unwind: { path: '$brand', preserveNullAndEmptyArrays: true } },
+      {
+        $addFields: {
+          store_name: { $ifNull: ['$brand.name', '$store_name'] },
+          store_slug: { $ifNull: ['$brand.slug', '$store_slug'] },
+        },
+      },
+      { $project: { service: 0, brand: 0 } },
+    ]),
     Offer.countDocuments(filter),
   ]);
 
