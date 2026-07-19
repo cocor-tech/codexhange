@@ -66,31 +66,37 @@ export default function AdminPage() {
     if (session.locked) return;
     setBusy(true);
     setError('');
-    const res = await window.fetch('/api/admin/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, action: 'login' }),
-    });
-    const data = await res.json();
-    setBusy(false);
-    if (!res.ok) {
-      setError(data.error || 'Invalid credentials');
-      if (data.locked) {
-        setSession({ ...session, authenticated: false, locked: true });
-        setPassword('');
+    try {
+      const res = await window.fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, action: 'login' }),
+      });
+      let data: any = {};
+      try { data = await res.json(); } catch { data = { error: 'Server error — empty response' }; }
+      setBusy(false);
+      if (!res.ok) {
+        setError(data.error || 'Invalid credentials');
+        if (data.locked) {
+          setSession({ ...session, authenticated: false, locked: true });
+          setPassword('');
+        }
+        return;
       }
-      return;
+      setPassword('');
+      if (data.requiresOtp) {
+        setOtpRequired(true);
+        msg('Verification code sent');
+        if (data.devCode) console.info('Admin OTP dev code:', data.devCode);
+        return;
+      }
+      window.localStorage.setItem('admin_token', data.token);
+      setSession({ authenticated: true, email, loading: false });
+      msg('Signed in');
+    } catch (err) {
+      setBusy(false);
+      setError('Network error — could not reach server');
     }
-    setPassword('');
-    if (data.requiresOtp) {
-      setOtpRequired(true);
-      msg('Verification code sent');
-      if (data.devCode) console.info('Admin OTP dev code:', data.devCode);
-      return;
-    }
-    window.localStorage.setItem('admin_token', data.token);
-    setSession({ authenticated: true, email, loading: false });
-    msg('Signed in');
   };
 
   const resendOtp = async () => {
@@ -116,22 +122,28 @@ export default function AdminPage() {
     if (session.locked) return;
     setBusy(true);
     setError('');
-    const res = await window.fetch('/api/admin/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, otp, action: 'verify' }),
-    });
-    const data = await res.json();
-    setBusy(false);
-    if (!res.ok) {
-      setError(data.error || 'Invalid code');
-      return;
+    try {
+      const res = await window.fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp, action: 'verify' }),
+      });
+      let data: any = {};
+      try { data = await res.json(); } catch { data = { error: 'Server error — empty response' }; }
+      setBusy(false);
+      if (!res.ok) {
+        setError(data.error || 'Invalid code');
+        return;
+      }
+      window.localStorage.setItem('admin_token', data.token);
+      setSession({ authenticated: true, email, loading: false });
+      setOtpRequired(false);
+      setOtp('');
+      msg('Signed in');
+    } catch (err) {
+      setBusy(false);
+      setError('Network error — could not reach server');
     }
-    window.localStorage.setItem('admin_token', data.token);
-    setSession({ authenticated: true, email, loading: false });
-    setOtpRequired(false);
-    setOtp('');
-    msg('Signed in');
   };
 
   const changePassword = async () => {
