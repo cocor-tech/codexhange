@@ -8,11 +8,13 @@ export default function WebsitesPage() {
   const [addUrl, setAddUrl] = useState('');
   const [adding, setAdding] = useState(false);
   const [filter, setFilter] = useState('');
+  const [search, setSearch] = useState('');
 
   const load = async () => {
     setLoading(true);
     const params = new URLSearchParams({ limit: '100' });
     if (filter) params.set('status', filter);
+    if (search) params.set('search', search);
     const res = await window.fetch(`/api/admin/websites?${params}`);
     if (res.ok) setWebsites((await res.json()).websites || []);
     setLoading(false);
@@ -79,6 +81,9 @@ export default function WebsitesPage() {
             </button>
           </div>
         </div>
+
+        <input value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && load()}
+          placeholder="Search websites..." className="input-glass px-3 py-2 text-xs w-full max-w-xs mb-4" />
 
         <div className="flex gap-2 mb-4">
           {['', 'active', 'paused', 'blocked'].map(s => (
