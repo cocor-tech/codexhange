@@ -207,14 +207,17 @@ async def process_jobs():
                 print(f"  {Fore.RED}[-] {brand_name:<20} timeout{Style.RESET_ALL}")
 
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--scan", action="store_true")
-    p.add_argument("--process-jobs", action="store_true")
-    p.add_argument("--max", type=int)
-    p.add_argument("--names", type=str)
-    p.add_argument("--stale", action="store_true")
-    p.add_argument("--purge-expired", action="store_true")
+    VERSION = "2.0.0"
+    p = argparse.ArgumentParser(description="Codexhange Offer Intelligence Platform")
+    p.add_argument("--scan", action="store_true", help="Scan all active websites")
+    p.add_argument("--process-jobs", action="store_true", help="Process queued scan jobs")
+    p.add_argument("--max", type=int, help="Max websites to scan")
+    p.add_argument("--names", type=str, help="Filter by brand names (comma-separated)")
+    p.add_argument("--stale", action="store_true", help="Scan websites not checked in 24h")
+    p.add_argument("--purge-expired", action="store_true", help="Mark expired offers")
+    p.add_argument("--version", action="store_true", help="Show version")
     args = p.parse_args()
+    if args.version: print(f"Codexhange Bot v{VERSION}"); return
     if args.purge_expired: purge_expired(); return
     if args.process_jobs: asyncio.run(process_jobs()); return
     if args.stale: asyncio.run(discover_all(stale_hours=24)); return

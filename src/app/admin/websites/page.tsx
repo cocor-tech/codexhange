@@ -23,25 +23,33 @@ export default function WebsitesPage() {
   const addWebsite = async () => {
     if (!addUrl.trim()) return;
     setAdding(true);
-    await window.fetch('/api/admin/websites', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: addUrl.trim() }),
-    });
-    setAddUrl('');
+    try {
+      const res = await window.fetch('/api/admin/websites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: addUrl.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { alert(data.error || 'Failed to add website'); setAdding(false); return; }
+      setAddUrl('');
+      load();
+    } catch (err) {
+      alert('Network error — check your connection');
+    }
     setAdding(false);
-    load();
   };
 
   const deleteWebsite = async (id: string, name: string) => {
-    if (!window.confirm(`Delete ${name}?`)) return;
-    const delOffers = window.confirm('Delete offers too?');
-    await window.fetch('/api/admin/websites', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ websiteId: id, deleteOffers: delOffers }),
-    });
-    load();
+    if (!window.confirm(`Delete "${name}"?\nThis action cannot be undone.`)) return;
+    const delOffers = window.confirm('Also delete all offers from this website?');
+    try {
+      await window.fetch('/api/admin/websites', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ websiteId: id, deleteOffers: delOffers }),
+      });
+      load();
+    } catch { alert('Failed to delete'); }
   };
 
   const healthColor = (score: number) => {
