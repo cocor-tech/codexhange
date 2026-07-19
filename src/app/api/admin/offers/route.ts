@@ -22,7 +22,9 @@ export async function GET(req: NextRequest) {
   }
 
   const filter: any = {};
+  const websiteId = searchParams.get('websiteId');
   if (serviceId) filter.serviceId = serviceId;
+  if (websiteId) filter.websiteId = websiteId;
   if (status) filter.status = status;
 
   const [offers, total] = await Promise.all([

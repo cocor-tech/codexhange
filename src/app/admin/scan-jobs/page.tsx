@@ -59,7 +59,7 @@ export default function ScanJobsPage() {
               ))}
               {jobs.length === 0 && (
                 <div className="text-center py-12 text-xs" style={{ color: 'var(--text-muted)' }}>
-                  No scan jobs yet. Add a website to create jobs automatically.
+                  No scan jobs yet. Add a website at <a href="/admin/websites" className="underline" style={{ color: '#3b82f6' }}>/admin/websites</a> to create jobs automatically.
                 </div>
               )}
             </div>

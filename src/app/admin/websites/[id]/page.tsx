@@ -36,6 +36,7 @@ export default function WebsiteDetailPage() {
             <span className="text-xs rounded-full px-2 py-0.5" style={{ backgroundColor: `${healthColor(w.stats?.health_score || 100)}20`, color: healthColor(w.stats?.health_score || 100) }}>
               {w.stats?.health_score || 100}% health
             </span>
+            <a href={`/admin/offers?website=${id}`} className="btn-glass px-3 py-1.5 text-xs">View Offers</a>
             <a href={w.url} target="_blank" className="btn-glass px-3 py-1.5 text-xs">Open Website</a>
           </div>
         </div>

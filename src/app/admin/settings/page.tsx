@@ -83,7 +83,18 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <button onClick={save} className="btn-primary px-5 py-2 text-sm">{saved ? 'Saved!' : 'Save Settings'}</button>
+          <div className="glass-card p-5">
+            <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>General</h2>
+            <div className="space-y-3 max-w-sm">
+              <div>
+                <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Concurrent Workers</label>
+                <input type="range" min="1" max="30" value="15" className="w-full" />
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>15</span>
+              </div>
+            </div>
+          </div>
+
+          <button onClick={save} className="btn-primary px-5 py-2 text-sm">{saved ? 'Saved ✓' : 'Save Settings'}</button>
         </div>
       </div>
     </div>

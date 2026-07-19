@@ -10,11 +10,15 @@ export default function OffersPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
 
+  const getWebsiteId = () => new URLSearchParams(window.location.search).get('website');
+
   const load = async (p: number) => {
     setLoading(true);
     const params = new URLSearchParams({ limit: '50', page: String(p) });
     if (filter) params.set('status', filter);
     if (typeFilter) params.set('deal_type', typeFilter);
+    const wid = getWebsiteId();
+    if (wid) params.set('websiteId', wid);
     const res = await window.fetch(`/api/admin/offers?${params}`);
     if (res.ok) {
       const d = await res.json();
