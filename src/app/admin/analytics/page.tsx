@@ -4,22 +4,28 @@ import { useState, useEffect } from 'react';
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<any>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    Promise.all([
-      window.fetch('/api/admin/offers?limit=1').then(r => r.json()),
-      window.fetch('/api/admin/websites').then(r => r.json()),
-      window.fetch('/api/admin/scan-jobs?limit=1').then(r => r.json()),
-      window.fetch('/api/admin/logs').then(r => r.json()),
-    ]).then(([offersRes, sitesRes, jobsRes, logsRes]) => {
+  const load = async () => {
+    setRefreshing(true);
+    try {
+      const [offersRes, sitesRes, jobsRes, logsRes] = await Promise.all([
+        window.fetch('/api/admin/offers?limit=1').then(r => r.json()),
+        window.fetch('/api/admin/websites').then(r => r.json()),
+        window.fetch('/api/admin/scan-jobs?limit=1').then(r => r.json()),
+        window.fetch('/api/admin/logs').then(r => r.json()),
+      ]);
       setData({
         totalOffers: offersRes.total || 0,
         totalSites: sitesRes.total || 0,
         totalJobs: jobsRes.total || 0,
         logs: logsRes.logs || [],
       });
-    });
-  }, []);
+    } catch {}
+    setRefreshing(false);
+  };
+
+  useEffect(() => { load(); }, []);
 
   const successRate = data?.logs?.length
     ? Math.round((data.logs.filter((l: any) => l.status === 'success').length / data.logs.length) * 100)
@@ -30,7 +36,10 @@ export default function AnalyticsPage() {
       <div className="mx-auto max-w-5xl px-6 py-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Analytics</h1>
-          <a href="/admin" className="text-xs hover:underline" style={{ color: 'var(--text-muted)' }}>← Dashboard</a>
+          <div className="flex gap-2 items-center">
+            <button onClick={load} disabled={refreshing} className="btn-glass px-3 py-1.5 text-xs">{refreshing ? 'Refreshing…' : 'Refresh'}</button>
+            <a href="/admin" className="text-xs hover:underline" style={{ color: 'var(--text-muted)' }}>← Dashboard</a>
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-4 mb-6">

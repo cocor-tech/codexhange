@@ -39,6 +39,10 @@ export default function ScannerPage() {
   const scan = async (targetUrl?: string) => {
     const url = targetUrl || inputUrl.trim() || (selectedBrand ? brands.find(b => b._id === selectedBrand)?.website : '');
     if (!url) return;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      addLog('Please enter a valid URL (include http:// or https://)');
+      return;
+    }
 
     setScanning(true);
     setLogs([]);

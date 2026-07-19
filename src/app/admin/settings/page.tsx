@@ -21,12 +21,17 @@ export default function SettingsPage() {
   }, []);
 
   const save = async () => {
+    if (aiProvider && !aiKey) {
+      alert('API key is required when a provider is selected');
+      return;
+    }
     const res = await window.fetch('/api/admin/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ provider: aiProvider, api_key: aiKey, model: aiModel, enabled: aiEnabled }),
     });
-    if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 2000); }
+    if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
+    else { alert('Failed to save settings'); }
   };
 
   return (
