@@ -274,6 +274,14 @@ export default function AdminPage() {
         </div>
 
         <div className="mt-6 glass-card p-5">
+          <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Offer Intelligence Platform</h2>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Version 2.0 — Built with Python async scraper, Next.js admin panel, and MongoDB.
+            <a href="https://github.com/oraimoitel/codexhange" target="_blank" className="ml-2 underline" style={{ color: '#3b82f6' }}>GitHub</a>
+          </p>
+        </div>
+
+        <div className="mt-6 glass-card p-5">
           <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Change admin password</h2>
           <div className="flex flex-col gap-2 max-w-xs">
             <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="input-glass px-3 py-2 text-sm" placeholder="Current password" />
