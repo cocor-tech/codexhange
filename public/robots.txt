@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://codexhange.com/sitemap.xml
