@@ -38,25 +38,32 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const { url } = await req.json();
-  if (!url) return NextResponse.json({ error: 'URL required' }, { status: 400 });
+  if (!url || typeof url !== 'string') return NextResponse.json({ error: 'Valid URL required' }, { status: 400 });
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
+  } catch {
+    return NextResponse.json({ error: 'Invalid URL format' }, { status: 400 });
+  }
 
   await connectDB();
 
-  const domain = new URL(url).hostname.replace('www.', '');
+  const domain = parsed.hostname.replace('www.', '');
   const name = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
+  const cleanUrl = parsed.origin;
 
   const existing = await Website.findOne({ url });
   if (existing) return NextResponse.json({ website: existing });
 
   const website = await Website.create({
-    url,
+    url: cleanUrl,
     domain,
     brand: { name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-') },
     status: 'active',
   });
 
-  // Create initial scan jobs for common deal pages
-  const base = url.replace(/\/$/, '');
+  const base = cleanUrl.replace(/\/$/, '');
   const jobs = INITIAL_PATTERNS.map(pattern => ({
     websiteId: website._id,
     url: `${base}${pattern}`,
