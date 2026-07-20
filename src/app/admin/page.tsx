@@ -242,24 +242,52 @@ export default function AdminPage() {
           </div>
 
           {/* Scan progress */}
-          {scanProgress?.status === 'running' && (
+          {scanProgress && scanProgress.status !== 'idle' && scanProgress.total > 0 && (
             <div className="glass-card p-4 mb-6">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-                  Full Scan <span className="text-xs font-normal" style={{ color: '#22c55e' }}>● Running</span>
-                </h3>
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  ETA: {scanProgress.eta_min}min · {scanProgress.offers} offers found
-                </span>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                    Full Scan
+                  </h3>
+                  <span className={`text-xs font-medium ${
+                    scanProgress.status === 'running' ? 'text-green-500' :
+                    scanProgress.status === 'paused' ? 'text-yellow-500' :
+                    scanProgress.status === 'complete' ? 'text-blue-500' : 'text-gray-500'
+                  }`}>
+                    ● {scanProgress.status}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {scanProgress.status === 'running' && (
+                    <button onClick={async () => {
+                      await window.fetch('/api/admin/scan-progress', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ action: 'pause' })
+                      });
+                    }} className="btn-glass px-3 py-1 text-xs">Pause</button>
+                  )}
+                  {scanProgress.status === 'paused' && (
+                    <button onClick={async () => {
+                      await window.fetch('/api/admin/scan-progress', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ action: 'continue' })
+                      });
+                    }} className="btn-glass px-3 py-1 text-xs">Continue</button>
+                  )}
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {scanProgress.offers} offers · ETA: {scanProgress.eta_min || '?'}min
+                  </span>
+                </div>
               </div>
               <div className="h-2 rounded-full" style={{ backgroundColor: 'var(--bg-secondary)' }}>
                 <div className="h-full rounded-full transition-all duration-1000" style={{
                   width: `${Math.min((scanProgress.done / scanProgress.total) * 100, 100)}%`,
-                  backgroundColor: '#22c55e'
+                  backgroundColor: scanProgress.status === 'complete' ? '#3b82f6' : '#22c55e'
                 }} />
               </div>
               <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
-                {scanProgress.done.toLocaleString()} / {scanProgress.total.toLocaleString()} stores checked
+                {scanProgress.done.toLocaleString()} / {scanProgress.total.toLocaleString()} stores
+                {scanProgress.done > 0 && ` (${Math.round((scanProgress.done / scanProgress.total) * 100)}%)`}
               </p>
             </div>
           )}

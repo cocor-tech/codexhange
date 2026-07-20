@@ -1,8 +1,7 @@
 """
-Full scan of ALL 20K+ promocodes.com stores.
-Runs in batches of 10 with 1s delay between each to avoid rate limiting.
-Estimated time: 20K stores × ~3s per store = ~16 hours.
-Logs progress and can be resumed.
+Full scan of ALL 20K+ promocodes.com stores with pause/continue support.
+Saves progress to MongoDB after every batch.
+Check pause flag before each batch.
 """
 
 import asyncio, httpx, re, json, os, sys, time
@@ -24,24 +23,39 @@ if not MONGO_URI:
                         MONGO_URI = line.split("=", 1)[1].strip().strip("'\"")
 
 BATCH_SIZE = 10
-DELAY = 1.0
-PROGRESS_FILE = "/tmp/codexhange_scan_progress.txt"
+SLUG_CACHE = "/tmp/codexhange_slugs.json"
 
 async def get_all_slugs() -> list:
+    """Fetch and cache all store slugs from sitemap."""
+    if os.path.exists(SLUG_CACHE):
+        with open(SLUG_CACHE) as f:
+            cached = json.load(f)
+            if time.time() - cached.get("ts", 0) < 86400:
+                return cached["slugs"]
     async with httpx.AsyncClient(timeout=30.0) as c:
         r = await c.get("https://www.promocodes.com/sitemap-stores.xml",
-            headers={"User-Agent": "Mozilla/5.0"})
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
     urls = re.findall(r'<loc>(.*?)</loc>', r.text)
-    slugs = list(set(u.replace("https://www.promocodes.com/", "").replace("-coupons", "").rstrip("/") for u in urls))
-    return sorted(slugs)
+    slugs = sorted(set(u.replace("https://www.promocodes.com/", "").replace("-coupons", "").rstrip("/") for u in urls))
+    with open(SLUG_CACHE, "w") as f:
+        json.dump({"ts": time.time(), "slugs": slugs}, f)
+    return slugs
 
-async def check_slug(slug: str, client: httpx.AsyncClient) -> bool:
-    try:
-        r = await client.get(f"https://www.promocodes.com/{slug}",
-            headers={"User-Agent": "Mozilla/5.0"}, timeout=6.0)
-        return r.status_code == 200
-    except:
-        return False
+async def is_paused(db) -> bool:
+    """Check if scan should pause."""
+    c = db.scan_progress.find_one({"_id": "full_scan"})
+    return c.get("paused", False) if c else False
+
+async def save_progress(db, done, total, offers, eta, status="running"):
+    db.scan_progress.update_one(
+        {"_id": "full_scan"},
+        {"$set": {
+            "done": done, "total": total, "offers": offers,
+            "eta_min": round(eta, 1), "status": status,
+            "paused": False, "updated_at": datetime.now(timezone.utc),
+        }},
+        upsert=True,
+    )
 
 async def scan_slug(slug: str, db) -> int:
     adapter = PromoCodesAdapter()
@@ -75,70 +89,84 @@ async def scan_slug(slug: str, db) -> int:
                 upsert=True,
             )
         return len(results)
-    except:
+    except Exception as e:
         return 0
+
+async def scan_batch(slugs: list, db) -> int:
+    """Scan a batch of slugs, return found count."""
+    found = 0
+    async with httpx.AsyncClient(timeout=10.0) as c:
+        checks = await asyncio.gather(*[
+            _check_slug(s, c) for s in slugs
+        ], return_exceptions=True)
+    
+    valid = [s for s, ok in zip(slugs, checks) if ok is True]
+    
+    for slug in valid:
+        count = await scan_slug(slug, db)
+        if count:
+            found += count
+            print(f"  + {slug}: {count} offers")
+        await asyncio.sleep(0.5)
+    
+    return found
+
+async def _check_slug(slug: str, client: httpx.AsyncClient) -> bool:
+    try:
+        r = await client.get(f"https://www.promocodes.com/{slug}",
+            headers={"User-Agent": "Mozilla/5.0"}, timeout=6.0)
+        return r.status_code == 200
+    except:
+        return False
 
 async def main():
     client = MongoClient(MONGO_URI)
     db = client.get_database()
 
-    # Load progress
-    start_from = 0
-    if os.path.exists(PROGRESS_FILE):
-        with open(PROGRESS_FILE) as f:
-            start_from = int(f.read().strip())
-        print(f"Resuming from index {start_from}")
+    # Load existing progress
+    existing = db.scan_progress.find_one({"_id": "full_scan"})
+    start_from = existing.get("done", 0) if existing else 0
+    status = existing.get("status", "") if existing else ""
+
+    # If status is "complete" or "idle", start fresh
+    if status in ("complete", "idle"):
+        start_from = 0
+
+    print(f"Resuming from index {start_from}")
 
     all_slugs = await get_all_slugs()
-    print(f"Total stores to scan: {len(all_slugs)}")
+    total = len(all_slugs)
+    print(f"Total stores: {total}")
 
-    total_found = 0
-    done = 0
+    found_offers = db.offers.count_documents({"status": "published"})
+    start_time = time.time()
 
-    for i in range(start_from, len(all_slugs), BATCH_SIZE):
+    for i in range(start_from, total, BATCH_SIZE):
+        # Check pause
+        if await is_paused(db):
+            await save_progress(db, i, total, found_offers, 0, "paused")
+            print(f"Paused at {i}/{total}")
+            client.close()
+            return
+
         batch = all_slugs[i:i+BATCH_SIZE]
-        
-        # Quick check which slugs are valid
-        async with httpx.AsyncClient(timeout=10.0) as c:
-            checks = await asyncio.gather(*[check_slug(s, c) for s in batch])
-        
-        valid = [s for s, ok in zip(batch, checks) if ok]
-        
-        for slug in valid:
-            count = await scan_slug(slug, db)
-            if count:
-                total_found += count
-                print(f"  [{done}] {slug}: {count} offers")
-            await asyncio.sleep(0.3)
-            done += 1
+        count = await scan_batch(batch, db)
+        if count:
+            found_offers = db.offers.count_documents({"status": "published"})
 
-        done += len(batch) - len(valid)
+        # Save progress
+        elapsed = time.time() - start_time
+        rate = (i + BATCH_SIZE) / elapsed if elapsed > 0 else 1
+        eta = (total - i - BATCH_SIZE) / rate if rate > 0 else 0
+        await save_progress(db, i + BATCH_SIZE, total, found_offers, eta / 60)
 
-        # Save progress every 50
-        if (i + BATCH_SIZE) % 50 == 0:
-            total_offers = db.offers.count_documents({"status": "published"})
-            elapsed = time.time() - start_time
-            rate = (i + BATCH_SIZE) / elapsed if elapsed > 0 else 0
-            remaining = (len(all_slugs) - i - BATCH_SIZE) / rate if rate > 0 else 0
-            db.scan_progress.update_one(
-                {"_id": "full_scan"},
-                {"$set": {
-                    "total": len(all_slugs), "done": i + BATCH_SIZE,
-                    "offers": total_offers, "status": "running",
-                    "eta_min": round(remaining / 60, 1),
-                    "updated_at": datetime.now(timezone.utc),
-                }},
-                upsert=True,
-            )
-            print(f"\nProgress: {i+BATCH_SIZE}/{len(all_slugs)} | Found: {total_offers} offers | ETA: {remaining/60:.1f}min\n")
+        print(f"Progress: {i+BATCH_SIZE}/{total} | Offers: {found_offers} | ETA: {eta/60:.1f}min")
 
-    # Final
-    with open(PROGRESS_FILE, "w") as f:
-        f.write(str(len(all_slugs)))
-    total = db.offers.count_documents({"status": "published"})
-    print(f"\nComplete! Total published offers: {total}")
+    # Complete
+    found_offers = db.offers.count_documents({"status": "published"})
+    await save_progress(db, total, total, found_offers, 0, "complete")
+    print(f"\nComplete! Total published offers: {found_offers}")
     client.close()
 
-start_time = time.time()
 if __name__ == "__main__":
     asyncio.run(main())
