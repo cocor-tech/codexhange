@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongoose';
-import { createSession, ensureSeedAdmin, generateOtp, isAdminEmail, storeOtp, verifyOtp, verifyAdminPassword, setAdminPassword } from '@/lib/adminAuth';
+import { createSession, ensureSeedAdmin, generateOtp, isAdminEmail, storeOtp, verifyOtp, verifyAdminPassword, setAdminPassword, ensureBlacklistIndex } from '@/lib/adminAuth';
 import { checkIpRate, checkAccountRate, recordFailure, clearAccountRate } from '@/lib/rateLimiter';
 
 export const dynamic = 'force-dynamic';
@@ -27,7 +27,7 @@ async function sendOtpEmail(email: string, otp: string) {
         sender: { email: from, name: 'Codexhange Admin' },
         to: [{ email }],
         subject: 'Your Codexhange admin sign-in code',
-        htmlContent: `<p>Your admin sign-in code is <strong>${otp}</strong>.</p><p>This code expires in 10 minutes.</p>`,
+        htmlContent: `<p>Your admin sign-in code is <strong>${otp}</strong>.</p><p>This code expires in 5 minutes.</p>`,
       }),
     });
 
@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
 
     await connectDB();
     await ensureSeedAdmin();
+    await ensureBlacklistIndex();
     const result = await verifyAdminPassword(email, password);
     if (!result.ok) {
       const status = await recordFailure(email);

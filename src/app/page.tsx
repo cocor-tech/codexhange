@@ -98,7 +98,7 @@ export default async function HomePage() {
               <Link key={b.slug} href={`/brand/${b.slug}`}
                 className="rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors hover:border-brand-500/50 hover:bg-brand-500/10"
                 style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
-                {b.name}
+                {b.name} <span className="text-[10px] opacity-50">→</span>
               </Link>
             ))}
           </div>
@@ -148,7 +148,7 @@ export default async function HomePage() {
               <Link key={cat.slug} href={`/category/${cat.slug}`}
                 className="glass-card px-4 py-2.5 text-sm font-medium transition-all hover:scale-[1.03]"
                 style={{ color: 'var(--text-primary)' }}>
-                {cat.name}
+                {cat.name} <span className="text-xs opacity-50">→</span>
                 <span className="ml-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>({cat.brandCount})</span>
               </Link>
             ))}

@@ -70,13 +70,11 @@ class PromoCodesAdapter:
                 source_url = f"{BASE}/{quote(slug.lower())}"
                 detail_url = f"{source_url}?offer={coupon_id or 0}"
 
-                # For codes: link to brand's site directly (user just needs the code)
-                # For deals without codes: link to promocodes for the deal info
-                final_url = detail_url if not final_code else brand_website
+                final_url = f"{brand_website}#offer={coupon_id or 0}"
 
                 entry = {
                     "sourceUrl": final_url,
-                    "sourcePage": source_url,
+                    "sourcePage": final_url,
                     "title": f"{headline[:200]}" if headline else f"{store_name} Offer",
                     "description": description[:500] if description else headline[:500],
                     "code": final_code,
