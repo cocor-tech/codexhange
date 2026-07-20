@@ -3,6 +3,9 @@ import { Poppins } from 'next/font/google';
 import { ToastProvider } from '@/components/ui/Toast';
 import { Navbar } from '@/components/Navbar';
 import Link from 'next/link';
+import { connectDB } from '@/lib/mongoose';
+import Offer from '@/lib/models/Offer';
+import Category from '@/lib/models/Category';
 import './globals.css';
 
 const poppins = Poppins({
@@ -38,9 +41,38 @@ export const metadata: Metadata = {
   },
 };
 
-const currentYear = new Date().getFullYear();
+async function getFooterBrands() {
+  try {
+    await connectDB();
+    const brands = await Offer.aggregate([
+      { $match: { status: 'published' } },
+      { $group: { _id: '$store_name', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 6 },
+    ]);
+    return brands.map(b => ({
+      name: b._id,
+      slug: b._id.toLowerCase().replace(/ /g, '-').replace(/[^a-z0-9-]/g, ''),
+    }));
+  } catch { return []; }
+}
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+async function getFooterCategories() {
+  try {
+    await connectDB();
+    const cats = await Category.find({ active: true }).sort({ name: 1 }).limit(6).lean();
+    return cats.map((c: any) => ({ name: c.name, slug: c.slug }));
+  } catch { return []; }
+}
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const [popularBrands, categories] = await Promise.all([
+    getFooterBrands(),
+    getFooterCategories(),
+  ]);
+
+  const currentYear = new Date().getFullYear();
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${poppins.variable} font-sans antialiased flex min-h-screen flex-col`}>
@@ -56,16 +88,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <div>
                   <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Popular Brands</h4>
                   <ul className="space-y-1.5">
-                    {[
-                      { label: 'NordVPN', href: '/brand/nordvpn' },
-                      { label: 'Uber', href: '/brand/uber' },
-                      { label: 'DoorDash', href: '/brand/doordash' },
-                      { label: 'Spotify', href: '/brand/spotify' },
-                      { label: 'Nike', href: '/brand/nike' },
-                      { label: 'Amazon', href: '/brand/amazon' },
-                    ].map((link) => (
-                      <li key={link.href}>
-                        <Link href={link.href} className="hover:text-[--text-primary] transition-colors">{link.label} Promo Codes</Link>
+                    {popularBrands.map((b) => (
+                      <li key={b.slug}>
+                        <Link href={`/brand/${b.slug}`} className="hover:text-[--text-primary] transition-colors">{b.name} Promo Codes</Link>
                       </li>
                     ))}
                   </ul>
@@ -73,16 +98,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <div>
                   <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Categories</h4>
                   <ul className="space-y-1.5">
-                    {[
-                      { label: 'SaaS & Software', href: '/brand/nordvpn' },
-                      { label: 'Food & Delivery', href: '/brand/uber' },
-                      { label: 'Streaming', href: '/brand/spotify' },
-                      { label: 'Fashion', href: '/brand/nike' },
-                      { label: 'Travel', href: '/brand/uber' },
-                      { label: 'Online Learning', href: '/brand/skillshare' },
-                    ].map((link) => (
-                      <li key={link.label}>
-                        <Link href={link.href} className="hover:text-[--text-primary] transition-colors">{link.label}</Link>
+                    {categories.map((c) => (
+                      <li key={c.slug}>
+                        <Link href={`/category/${c.slug}`} className="hover:text-[--text-primary] transition-colors">{c.name}</Link>
                       </li>
                     ))}
                   </ul>
