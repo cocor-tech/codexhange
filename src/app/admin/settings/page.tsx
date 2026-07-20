@@ -6,8 +6,35 @@ export default function SettingsPage() {
   const [aiProvider, setAiProvider] = useState('');
   const [aiKey, setAiKey] = useState('');
   const [aiModel, setAiModel] = useState('');
+  const [aiBaseUrl, setAiBaseUrl] = useState('');
   const [aiEnabled, setAiEnabled] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const providerDefaults: Record<string, { baseUrl: string; models: { value: string; label: string }[] }> = {
+    gemini: {
+      baseUrl: '',
+      models: [
+        { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (free, recommended)' },
+        { value: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash-Lite (free, faster)' },
+      ],
+    },
+    groq: {
+      baseUrl: 'https://api.groq.com/openai/v1',
+      models: [
+        { value: 'llama3-70b-8192', label: 'LLaMA 3 70B (fast)' },
+        { value: 'llama3-8b-8192', label: 'LLaMA 3 8B (fastest)' },
+        { value: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B (large context)' },
+        { value: 'gemma2-9b-it', label: 'Gemma 2 9B' },
+      ],
+    },
+    openai: {
+      baseUrl: 'https://api.openai.com/v1',
+      models: [
+        { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+        { value: 'gpt-4o', label: 'GPT-4o' },
+      ],
+    },
+  };
 
   useEffect(() => {
     window.fetch('/api/admin/settings').then(r => r.ok && r.json()).then(d => {
@@ -15,10 +42,22 @@ export default function SettingsPage() {
         setAiProvider(d.provider || '');
         setAiKey(d.api_key || '');
         setAiModel(d.model || '');
+        setAiBaseUrl(d.base_url || '');
         setAiEnabled(d.enabled || false);
       }
     }).catch(() => {});
   }, []);
+
+  const handleProviderChange = (p: string) => {
+    setAiProvider(p);
+    const defaults = providerDefaults[p];
+    if (defaults) {
+      setAiBaseUrl(defaults.baseUrl);
+      if (defaults.models.length > 0) {
+        setAiModel(defaults.models[0].value);
+      }
+    }
+  };
 
   const save = async () => {
     if (aiProvider && !aiKey) {
@@ -28,7 +67,7 @@ export default function SettingsPage() {
     const res = await window.fetch('/api/admin/settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: aiProvider, api_key: aiKey, model: aiModel, enabled: aiEnabled }),
+      body: JSON.stringify({ provider: aiProvider, api_key: aiKey, model: aiModel, base_url: aiBaseUrl, enabled: aiEnabled }),
     });
     if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }
     else { alert('Failed to save settings'); }
@@ -52,12 +91,12 @@ export default function SettingsPage() {
             <div className="space-y-3 max-w-sm">
               <div>
                 <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Provider</label>
-                <select value={aiProvider} onChange={e => setAiProvider(e.target.value)}
+                <select value={aiProvider} onChange={e => handleProviderChange(e.target.value)}
                   className="input-glass px-3 py-2 text-sm w-full" style={{ color: 'var(--text-primary)' }}>
                   <option value="">— Disabled —</option>
                   <option value="gemini">Gemini (Google, free tier)</option>
+                  <option value="groq">Groq (fast inference, free tier)</option>
                   <option value="openai">OpenAI</option>
-                  <option value="huggingface">HuggingFace</option>
                 </select>
               </div>
               <div>
@@ -67,13 +106,32 @@ export default function SettingsPage() {
                   className="input-glass px-3 py-2 text-sm w-full"
                   type="password" />
               </div>
+              {aiProvider === 'groq' || aiProvider === 'openai' ? (
+                <div>
+                  <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Base URL</label>
+                  <input value={aiBaseUrl} onChange={e => setAiBaseUrl(e.target.value)}
+                    className="input-glass px-3 py-2 text-sm w-full font-mono text-xs"
+                    style={{ color: 'var(--text-primary)' }} />
+                </div>
+              ) : null}
               <div>
                 <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Model</label>
                 <select value={aiModel} onChange={e => setAiModel(e.target.value)}
                   className="input-glass px-3 py-2 text-sm w-full" style={{ color: 'var(--text-primary)' }}>
-                  <option value="gemini-2.0-flash">Gemini 2.0 Flash (free, recommended)</option>
-                  <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash-Lite (free, faster)</option>
-                  <option value="gpt-4o-mini">GPT-4o Mini</option>
+                  {(providerDefaults[aiProvider]?.models || []).length > 0
+                    ? providerDefaults[aiProvider].models.map(m => (
+                        <option key={m.value} value={m.value}>{m.label}</option>
+                      ))
+                    : (
+                      <>
+                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (free, recommended)</option>
+                        <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash-Lite (free, faster)</option>
+                        <option value="gpt-4o-mini">GPT-4o Mini</option>
+                        <option value="llama3-70b-8192">LLaMA 3 70B (Groq)</option>
+                        <option value="llama3-8b-8192">LLaMA 3 8B (Groq)</option>
+                      </>
+                    )
+                  }
                 </select>
               </div>
               <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>

@@ -1,9 +1,10 @@
 import { connectDB } from '@/lib/mongoose';
 import Code from '@/lib/models/Code';
+import Brand from '@/lib/models/Brand';
+import Offer from '@/lib/models/Offer';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { getCategory, getDidYouMean, getRelatedSearches, CATEGORY_BRANDS, BRAND_CATEGORIES } from '@/lib/brands';
-import { VoteButtons } from '@/components/codes/VoteButtons';
+import { getCategory, getDidYouMean, CATEGORY_BRANDS, BRAND_CATEGORIES } from '@/lib/brands';
 import { ShareButton } from '@/components/codes/ShareButton';
 
 interface Props {
@@ -11,303 +12,237 @@ interface Props {
   searchParams: { country?: string };
 }
 
-const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
-const currentYear = new Date().getFullYear();
-
-export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const slug = params.slug.toLowerCase();
   const brand = slug.charAt(0).toUpperCase() + slug.slice(1);
-  const country = searchParams.country?.toUpperCase();
-  const countryPath = country ? `/${country.toLowerCase()}/` : '/';
-  const known = !!BRAND_CATEGORIES[slug];
-
   return {
-    title: known
-      ? `${brand} Promo Codes & Discounts (${currentMonth} ${currentYear}) | CodeXhange`
-      : `${brand} Promo Codes — Not Found | CodeXhange`,
-    description: known
-      ? `Find verified ${brand} promo codes and discounts for ${currentMonth} ${currentYear}. Community-rated and always up to date.`
-      : `No active codes found for ${brand}. Browse similar verified discount codes from related brands.`,
-    alternates: {
-      canonical: `https://codexhange.com${countryPath}brand/${slug}`,
-      languages: country ? { [`en-${country}`]: `https://codexhange.com${countryPath}brand/${slug}` } : undefined,
-    },
+    title: `${brand} Promo Codes & Deals (${new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' })}) | CodeXhange`,
+    description: `Find verified ${brand} promo codes and discounts. Updated daily. Community-rated deals.`,
     openGraph: {
       title: `${brand} Promo Codes | CodeXhange`,
-      description: `Verified ${brand} discount codes — updated daily by the community.`,
+      description: `Verified ${brand} discount codes — updated daily.`,
     },
   };
 }
 
 export const revalidate = 60;
 
-async function getBrandCodes(slug: string, country?: string) {
-  const filter: any = { brandSlug: slug.toLowerCase(), archived: false };
-  if (country) {
-    filter.$or = [{ scope: 'global' }, { country: country.toUpperCase() }];
-  }
-  return Code.find(filter)
-    .sort({ createdAt: -1 })
-    .lean();
+async function getOffers(slug: string) {
+  const name = slug.charAt(0).toUpperCase() + slug.slice(1);
+  try {
+    return Offer.find({
+      status: 'published',
+      store_name: { $regex: slug.replace(/-/g, ' '), $options: 'i' },
+    }).sort({ confidence: -1, updatedAt: -1 }).lean();
+  } catch { return []; }
 }
 
-async function getCategoryCodes(category: string, excludeSlug: string, limit = 6) {
-  const catSlugs = (CATEGORY_BRANDS[category] || []).filter((s) => s !== excludeSlug);
-  if (catSlugs.length === 0) return [];
-  return Code.aggregate([
-    { $match: { brandSlug: { $in: catSlugs }, archived: false } },
-    {
-      $group: {
-        _id: { slug: '$brandSlug', name: '$brand' },
-        activeCodes: { $sum: 1 },
-        totalUpvotes: { $sum: '$upvotes' },
-        totalDownvotes: { $sum: '$downvotes' },
-      },
-    },
-    {
-      $project: {
-        _id: 0,
-        slug: '$_id.slug',
-        name: '$_id.name',
-        activeCodes: 1,
-        successRate: {
-          $cond: [
-            { $gt: [{ $add: ['$totalUpvotes', '$totalDownvotes'] }, 0] },
-            { $multiply: [{ $divide: ['$totalUpvotes', { $add: ['$totalUpvotes', '$totalDownvotes'] }] }, 100] },
-            0,
-          ],
-        },
-      },
-    },
-    { $sort: { activeCodes: -1 } },
-    { $limit: limit },
-  ]);
+async function getCategoryBrands(slug: string) {
+  const cat = BRAND_CATEGORIES[slug];
+  if (!cat) return [];
+  const siblings = (CATEGORY_BRANDS[cat] || []).filter(s => s !== slug).slice(0, 6);
+  return siblings.map(s => ({
+    slug: s,
+    name: s.charAt(0).toUpperCase() + s.slice(1),
+  }));
 }
 
-export default async function BrandPage({ params, searchParams }: Props) {
+async function getBrandInfo(slug: string) {
+  try {
+    return Brand.findOne({ slug, active: true }).lean() as any;
+  } catch { return null; }
+}
+
+export default async function BrandPage({ params }: Props) {
   const slug = params.slug.toLowerCase();
   const brand = slug.charAt(0).toUpperCase() + slug.slice(1);
-  const country = searchParams.country?.toUpperCase();
+  const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
+  const currentYear = new Date().getFullYear();
 
   await connectDB();
-  const codes = await getBrandCodes(slug, country);
-  const hasCodes = codes.length > 0;
+  const [offers, brandInfo, categoryBrands] = await Promise.all([
+    getOffers(slug),
+    getBrandInfo(slug),
+    getCategoryBrands(slug),
+  ]);
 
-  const category = getCategory(slug);
-  const didYouMean = hasCodes ? [] : getDidYouMean(slug);
-  const similarBrands = hasCodes ? [] : await getCategoryCodes(category, slug);
-  const relatedSearches = getRelatedSearches(category);
-
-  const brandTitle = `${brand} Promo Codes & Discounts`;
-  const pageTitle = hasCodes ? `${brandTitle} (${currentMonth} ${currentYear})` : `${brand} — Not Found`;
-
-  const jsonLd = hasCodes ? {
-    '@context': 'https://schema.org',
-    '@type': 'Product',
-    name: `${brand} Promo Codes`,
-    description: `Community-verified ${brand} discount codes. Updated ${currentMonth} ${currentYear}.`,
-    offers: codes.map((c: any) => ({
-      '@type': 'Offer',
-      priceSpecification: { '@type': 'UnitPriceSpecification', price: c.discount },
-      description: c.description,
-      availability: 'https://schema.org/InStock',
-    })),
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: '4.2',
-      bestRating: '5',
-      ratingCount: codes.length,
-    },
-  } : {
-    '@context': 'https://schema.org',
-    '@type': 'WebPage',
-    name: `${brand} Promo Codes`,
-    description: `Browse similar verified discount codes from related brands.`,
-  };
+  const hasCodes = offers.some((o: any) => o.code && o.code !== 'None');
+  const numCodes = offers.filter((o: any) => o.code && o.code !== 'None').length;
+  const numDeals = offers.filter((o: any) => !o.code || o.code === 'None').length;
 
   return (
-    <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-base)' }}>
-        <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,#d9770608_0%,transparent_60%)]" />
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-base)' }}>
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,#d9770608_0%,transparent_60%)]" />
 
-        {/* ── HEADER ── */}
-        <header className="relative z-10 mx-auto max-w-5xl px-6 py-5">
-          <Link href="/" className="text-sm font-medium transition-colors" style={{ color: 'var(--text-secondary)' }}>
-            &larr; Back to Home
-          </Link>
-        </header>
+      <div className="mx-auto max-w-4xl px-6 py-8">
+        <Link href="/" className="text-xs hover:underline" style={{ color: 'var(--text-muted)' }}>← Home</Link>
 
-        <main className="relative z-10 mx-auto max-w-4xl px-6 pb-32">
-          {/* ── BREADCRUMBS ── */}
-          <nav aria-label="Breadcrumb" className="mb-6 text-xs" style={{ color: 'var(--text-muted)' }}>
-            <ol className="flex flex-wrap items-center gap-1.5">
-              <li><Link href="/" className="hover:text-[--text-primary] transition-colors">Home</Link></li>
-              <li aria-hidden="true">/</li>
-              {country && (
-                <>
-                  <li><Link href={`/${country.toLowerCase()}`} className="hover:text-[--text-primary] transition-colors">{country}</Link></li>
-                  <li aria-hidden="true">/</li>
-                </>
-              )}
-              <li><span style={{ color: 'var(--text-primary)' }}>{brand}</span></li>
-            </ol>
-          </nav>
+        {/* HERO */}
+        <div className="mt-6 flex items-center gap-4">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl text-xl font-bold"
+            style={{ backgroundColor: '#d9770620', color: '#f59e0b' }}>
+            {brand.charAt(0)}
+          </span>
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              {brand} Promo Codes & Deals
+            </h1>
+            <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
+              {offers.length > 0
+                ? `${offers.length} offer${offers.length !== 1 ? 's' : ''} available`
+                : 'No offers yet — check back soon'}
+              {brandInfo?.website && ` · ${brandInfo.website.replace(/https?:\/\//, '')}`}
+              {offers.length > 0 && ` · Verified ${currentMonth} ${currentYear}`}
+            </p>
+          </div>
+        </div>
 
-          {hasCodes ? (
-            /* ── CODES FOUND ── */
-            <>
-              <div className="mb-10 text-center">
-                <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl" style={{ color: 'var(--text-primary)' }}>
-                  {pageTitle}
-                </h1>
-                {country && <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>Showing codes available in {country}</p>}
-                <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
-                  {codes.length} active code{codes.length !== 1 ? 's' : ''} — all verified by the community
-                </p>
+        {/* OFFERS */}
+        {offers.length > 0 ? (
+          <section className="mt-8 space-y-3">
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+              Active Offers
+              {numCodes > 0 && <span className="ml-2 text-sm font-normal" style={{ color: 'var(--text-muted)' }}>
+                ({numCodes} code{numCodes !== 1 ? 's' : ''} · {numDeals} deal{numDeals !== 1 ? 's' : ''})
+              </span>}
+            </h2>
+
+            {offers.map((o: any) => (
+              <div key={o._id.toString()} className="glass-card flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {o.code && o.code !== 'None' && (
+                      <code className="text-sm font-mono font-bold tracking-wide select-all rounded-md border px-2 py-0.5"
+                        style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                        {o.code}
+                      </code>
+                    )}
+                    <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${
+                      o.confidence >= 70 ? 'bg-green-500/15 text-green-400' : 'bg-yellow-500/15 text-yellow-400'
+                    }`}>
+                      {o.confidence}% confidence
+                    </span>
+                    {o.sourceReliability && (
+                      <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{o.sourceReliability}</span>
+                    )}
+                  </div>
+                  <p className="mt-1.5 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {o.title}
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                    {o.discount}
+                    {o.description && <span className="ml-2 opacity-70">{o.description.slice(0, 100)}</span>}
+                  </p>
+                  <div className="flex items-center gap-3 mt-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    {o.updatedAt && <span>✓ Updated {timeAgo(new Date(o.updatedAt))}</span>}
+                    {o.expiresAt && <span>⏱ Expires {new Date(o.expiresAt).toLocaleDateString()}</span>}
+                    {o.code && o.code !== 'None' && <ShareButton code={o.code} brand={brand} brandSlug={slug} description={o.title} />}
+                  </div>
+                </div>
+                {o.code && o.code !== 'None' ? (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <code className="rounded-lg border px-3 py-1.5 text-sm font-mono font-bold tracking-wide select-all"
+                      style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                      {o.code}
+                    </code>
+                  </div>
+                ) : (
+                  <a href={o.sourceUrl || '#'} target="_blank" rel="nofollow noopener noreferrer"
+                    className="btn-primary px-4 py-2 text-sm whitespace-nowrap shrink-0">
+                    Get Deal
+                  </a>
+                )}
               </div>
-
-              <div className="space-y-4">
-                {codes.map((code: any) => (
-                  <article key={code._id.toString()} className="glass-card flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{code.scope === 'global' ? 'Global' : code.country}</span>
-                        {code.expiresAt && <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Expires {new Date(code.expiresAt).toLocaleDateString()}</span>}
-                      </div>
-                      <h3 className="mt-1 text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{code.description}</h3>
-                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}><span className="font-semibold">Discount:</span> {code.discount}</p>
-                      {code.restrictions && <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{code.restrictions}</p>}
-                      <div className="mt-2 flex items-center gap-4 text-xs" style={{ color: 'var(--text-muted)' }}>
-                        <VoteButtons codeId={code._id.toString()} upvotes={code.upvotes} downvotes={code.downvotes} />
-                        <span>{code.clicks} clicks</span>
-                        <span>Submitted {new Date(code.createdAt).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <code className="rounded-lg border px-3 py-1.5 text-sm font-mono font-bold tracking-wide select-all" style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>{code.code}</code>
-                      {code.affiliateLink ? (
-                        <a href={code.affiliateLink} target="_blank" rel="nofollow sponsored noopener noreferrer" className="btn-primary px-4 py-1.5 text-sm whitespace-nowrap">Get Deal</a>
-                      ) : code.link ? (
-                        <a href={`/go?url=${encodeURIComponent(code.link)}&ref=${slug}`} target="_blank" rel="nofollow sponsored noopener noreferrer" className="btn-primary px-4 py-1.5 text-sm whitespace-nowrap">Use Code</a>
-                      ) : null}
-                    </div>
-                    <div className="flex items-center gap-2 sm:flex-col sm:gap-1">
-                      <ShareButton code={code.code} brand={code.brand} brandSlug={code.brandSlug} description={code.description} />
-                    </div>
-                  </article>
+            ))}
+          </section>
+        ) : brandInfo ? (
+          <div className="glass-card p-6 mt-8 text-center">
+            <p className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+              We&rsquo;re finding the best {brand} deals
+            </p>
+            <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+              Our bot is searching for active promo codes and discounts. Check back soon.
+            </p>
+          </div>
+        ) : (
+          <div className="glass-card p-6 mt-8 text-center">
+            <p className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+              We don&rsquo;t have {brand} codes yet
+            </p>
+            <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+              Be the first to submit a working code for {brand}!
+            </p>
+            {getDidYouMean(slug).length > 0 && (
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Did you mean:</span>
+                {getDidYouMean(slug).slice(0, 4).map((s: any) => (
+                  <Link key={s.slug} href={`/brand/${s.slug}`}
+                    className="rounded-lg border px-2.5 py-1 text-xs font-medium hover:border-brand-500/50 hover:bg-brand-500/10"
+                    style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                    {s.name}
+                  </Link>
                 ))}
               </div>
+            )}
+          </div>
+        )}
 
-              <section className="mt-12 glass-card">
-                <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>How to Use {brand} Promo Codes</h2>
-                <ol className="mt-3 space-y-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  <li>1. Click <strong style={{ color: 'var(--text-primary)' }}>&ldquo;Use Code&rdquo;</strong> next to any active promo code above.</li>
-                  <li>2. You will be redirected to {brand}&rsquo;s checkout page.</li>
-                  <li>3. Copy the code and paste it into the promo code field at checkout.</li>
-                  <li>4. Verify the discount is applied before completing your purchase.</li>
-                </ol>
-                <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Some codes have restrictions. Check the details listed with each code.
-                </p>
-              </section>
-            </>
-          ) : (
-            /* ── NO CODES FOUND — THE "TEMU MATCH" LAYOUT ── */
-            <>
-              {/* Did You Mean? */}
-              {didYouMean.length > 0 && (
-                <div className="glass-card mb-8">
-                  <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>💡 Did you mean:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {didYouMean.map((s) => (
-                      <Link
-                        key={s.slug}
-                        href={`/brand/${s.slug}`}
-                        className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:border-brand-500/50 hover:bg-brand-500/10"
-                        style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}
-                      >
-                        {s.name}
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
+        {/* FAQ */}
+        {offers.length > 0 && (
+          <section className="mt-12">
+            <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+              {brand} Promo Codes — Frequently Asked Questions
+            </h2>
+            <div className="space-y-3">
+              {[
+                { q: `Does ${brand} offer promo codes?`, a: `${brand} offers various discounts including${numCodes > 0 ? ' promo codes,' : ''} seasonal sales, and special deals. Check the active offers above for the latest savings.` },
+                { q: `How can I save money at ${brand}?`, a: `You can save by using active promo codes, checking for student/military discounts, signing up for newsletters, and shopping during sales events.` },
+                { q: `Are these ${brand} codes verified?`, a: `Each offer shows a confidence score based on our verification. Codes marked with 70%+ confidence are recently verified.` },
+                { q: `How often are ${brand} deals updated?`, a: `Our bot checks for new ${brand} deals daily. The "Updated" timestamp shows when each offer was last verified.` },
+              ].map(faq => (
+                <details key={faq.q} className="glass-card group open:pb-4">
+                  <summary className="cursor-pointer text-sm font-semibold list-none p-4" style={{ color: 'var(--text-primary)' }}>
+                    <span className="flex items-center justify-between gap-2">
+                      {faq.q}
+                      <svg className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </span>
+                  </summary>
+                  <p className="px-4 pb-4 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{faq.a}</p>
+                </details>
+              ))}
+            </div>
+          </section>
+        )}
 
-              {/* No results CTA */}
-              <div className="glass-card text-center py-12 mb-8">
-                <p className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                  We don&rsquo;t have codes for {brand} yet
-                </p>
-                <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  Be the first to submit a working code for {brand}!
-                </p>
-                <Link
-                  href="/"
-                  className="btn-primary mt-6 inline-flex px-5 py-2.5 text-sm"
-                >
-                  Browse All Codes &rarr;
+        {/* RELATED BRANDS */}
+        {categoryBrands.length > 0 && (
+          <section className="mt-10">
+            <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>
+              Related Brands
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {categoryBrands.map(b => (
+                <Link key={b.slug} href={`/brand/${b.slug}`}
+                  className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:border-brand-500/50 hover:bg-brand-500/10"
+                  style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
+                  {b.name} Promo Codes
                 </Link>
-              </div>
-
-              {/* Similar offers in category */}
-              {similarBrands.length > 0 && (
-                <div className="mb-8">
-                  <h2 className="text-lg font-bold mb-1" style={{ color: 'var(--text-primary)' }}>
-                    Similar Offers in {category}
-                  </h2>
-                  <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
-                    We don&rsquo;t have {brand} codes yet. Here are similar active deals:
-                  </p>
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {similarBrands.map((b: any) => (
-                      <Link
-                        key={b.slug}
-                        href={`/brand/${b.slug}`}
-                        className="glass-card flex items-center gap-3 p-3.5 hover:scale-[1.02] transition-transform"
-                      >
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold" style={{ backgroundColor: '#d9770620', color: '#f59e0b' }}>
-                          {b.name.charAt(0)}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{b.name}</p>
-                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                            {b.activeCodes} active code{b.activeCodes !== 1 ? 's' : ''} &middot; {Math.round(b.successRate)}% success
-                          </p>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Related Searches */}
-              <div className="glass-card">
-                <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Related Searches</h2>
-                <div className="flex flex-wrap gap-2">
-                  {relatedSearches.map((s) => (
-                    <Link
-                      key={s}
-                      href={`/brand/${slug}`}
-                      className="rounded-lg border px-3 py-1.5 text-xs transition-colors hover:border-brand-500/50 hover:bg-brand-500/10"
-                      style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
-                    >
-                      {s}
-                    </Link>
-                  ))}
-                  <Link
-                    href="/brand/nordvpn"
-                    className="rounded-lg border px-3 py-1.5 text-xs transition-colors hover:border-brand-500/50 hover:bg-brand-500/10"
-                    style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}
-                  >
-                    Browse All Active Codes
-                  </Link>
-                </div>
-              </div>
-            </>
-          )}
-        </main>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
-    </>
+    </div>
   );
+}
+
+function timeAgo(date: Date) {
+  const sec = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (sec < 60) return 'just now';
+  if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+  if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+  if (sec < 2592000) return `${Math.floor(sec / 86400)}d ago`;
+  return date.toLocaleDateString();
 }

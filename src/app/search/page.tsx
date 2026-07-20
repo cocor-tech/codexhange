@@ -254,7 +254,9 @@ function SearchPageContent() {
                     <div>
                       <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{brand.name}</h3>
                       <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                        {brand.category} · {brand.codes.length} code{brand.codes.length !== 1 ? 's' : ''}
+                        {brand.category}
+                        {brand.codes.length > 0 && ` · ${brand.codes.length} code${brand.codes.length !== 1 ? 's' : ''}`}
+                        {brand.offers?.length > 0 && ` · ${brand.offers.length} deal${brand.offers.length !== 1 ? 's' : ''}`}
                       </p>
                     </div>
                   </Link>
@@ -289,6 +291,29 @@ function SearchPageContent() {
                           </a>
                         ) : null}
                       </div>
+                    </div>
+                  ))}
+                  {brand.offers?.map((offer: any) => (
+                    <div key={offer._id} className="flex items-center justify-between rounded-lg border p-3" style={{ borderColor: 'var(--border)' }}>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>{offer.title}</span>
+                          <span className="text-[10px] rounded-full px-1.5 py-0.5 bg-green-500/15 text-green-400 shrink-0">
+                            {offer.confidence}%
+                          </span>
+                        </div>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                          {offer.discount}{offer.code ? ` · code: ${offer.code}` : ''}
+                        </p>
+                      </div>
+                      <a
+                        href={offer.sourceUrl || '#'}
+                        target="_blank"
+                        rel="nofollow noopener noreferrer"
+                        className="btn-primary px-3 py-1.5 text-xs whitespace-nowrap shrink-0 ml-3"
+                      >
+                        {offer.code ? 'Use Code' : 'Get Deal'}
+                      </a>
                     </div>
                   ))}
                 </div>

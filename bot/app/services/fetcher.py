@@ -47,4 +47,33 @@ async def smart_fetch(client: httpx.AsyncClient, url: str, timeout: float = 5.0)
         if g: return g
         w = await fetch_wayback(url)
         if w: return w
+        c = await fetch_cloudscraper(url)
+        if c: return c
+        p = await fetch_playwright(url)
+        if p: return p
     return result
+
+async def fetch_playwright(url: str) -> dict:
+    try:
+        from app.services.playwright_fetcher import fetch_with_playwright
+        result = await fetch_with_playwright(url, timeout=20.0)
+        if result.get("status") == 200 and result.get("text") and len(result["text"]) > 200:
+            return result
+    except:
+        pass
+    return None
+
+async def fetch_cloudscraper(url: str) -> dict:
+    try:
+        import cloudscraper
+        import asyncio
+        scraper = cloudscraper.create_scraper(
+            browser={"browser": "chrome", "platform": "windows", "mobile": False},
+            delay=2,
+        )
+        r = await asyncio.to_thread(scraper.get, url, timeout=12.0, allow_redirects=True)
+        if r and r.status_code == 200 and not is_cloudflare(r.text) and len(r.text) > 500:
+            return {"url": str(r.url), "status": 200, "text": r.text, "blocked": False, "source": "cloudscraper"}
+    except:
+        pass
+    return None

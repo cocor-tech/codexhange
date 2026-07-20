@@ -9,12 +9,25 @@ Configuration in MongoDB:
 
 from app.services.ai_provider import get_provider, NullProvider
 
+def load_provider(db=None) -> object:
+    """Load provider from MongoDB config, falling back to env vars."""
+    config = {}
+    if db:
+        try:
+            c = db["ai_config"].find_one({"_id": "global"})
+            if c:
+                config = c
+        except:
+            pass
+
+    name = config.get("provider", "") or ""
+    key = config.get("api_key", "") or ""
+    model = config.get("model", "") or ""
+    base_url = config.get("base_url", "") or ""
+
+    return get_provider(name, key, model, base_url)
+
 async def enrich_offer(title: str, description: str = "", provider=None) -> dict:
-    """
-    Enrich an offer with AI.
-    Returns dict with cleaned_title, deal_type, tags.
-    If AI fails or is not configured, returns originals.
-    """
     if not provider or isinstance(provider, NullProvider):
         return {"title": title, "deal_type": None, "tags": []}
 
@@ -32,7 +45,6 @@ async def enrich_offer(title: str, description: str = "", provider=None) -> dict
     }
 
 async def enrich_batch(offers: list, provider=None) -> list:
-    """Enrich multiple offers. Never raises."""
     results = []
     for offer in offers:
         result = await enrich_offer(

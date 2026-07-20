@@ -8,13 +8,13 @@ Usage:
 
 Available implementations:
     - GeminiProvider (free tier)
-    - HuggingFaceProvider (free inference)
-    - OpenAIProvider (requires key)
-    - OllamaProvider (local)
+    - OpenAIProvider (works with Groq, OpenAI, Together, etc.)
+    - HuggingFaceProvider (TODO)
+    - OllamaProvider (TODO)
 """
 
-from typing import Protocol
-from app.config.settings import AI_PROVIDER, AI_API_KEY, AI_MODEL
+from typing import Protocol, Optional
+from app.config.settings import AI_PROVIDER, AI_API_KEY, AI_MODEL, AI_BASE_URL
 
 class AIProvider(Protocol):
     async def summarize_offer(self, title: str, description: str) -> str: ...
@@ -30,13 +30,23 @@ class NullProvider:
     async def generate_tags(self, title: str, description: str = "") -> list:
         return []
 
-def get_provider(provider_name: str = "", api_key: str = "", model: str = "") -> AIProvider:
+def get_provider(provider_name: str = "", api_key: str = "", model: str = "", base_url: str = "") -> AIProvider:
     name = (provider_name or AI_PROVIDER).lower()
     key = api_key or AI_API_KEY
-    mdl = model or AI_MODEL or "gemini-2.0-flash"
+    mdl = model or AI_MODEL
+    url = base_url
 
     if name == "gemini" and key:
         from app.services.ai_gemini import GeminiProvider
-        return GeminiProvider(key, mdl)
+        return GeminiProvider(key, mdl or "gemini-2.0-flash")
+
+    if name in ("openai", "groq") and key:
+        from app.services.ai_openai import OpenAIProvider
+        if not url:
+            if name == "groq":
+                url = "https://api.groq.com/openai/v1"
+            else:
+                url = "https://api.openai.com/v1"
+        return OpenAIProvider(key, mdl or "gpt-4o-mini", url)
 
     return NullProvider()

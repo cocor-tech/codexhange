@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongoose';
 import Code from '@/lib/models/Code';
+import Offer from '@/lib/models/Offer';
 
 export const dynamic = 'force-dynamic';
 import { BRAND_CATEGORIES, CATEGORIES } from '@/lib/brands';
@@ -18,15 +19,11 @@ export async function GET(req: NextRequest) {
 
   await connectDB();
 
-  const matchFilter: any = { archived: false };
+  const escaped = q ? q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '';
 
-  if (country) {
-    matchFilter.$or = [{ scope: 'global' }, { country: country.toUpperCase() }];
-  }
-
-  if (q) {
-    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    matchFilter.$or = [
+  const codeFilter: any = { archived: false };
+  if (escaped) {
+    codeFilter.$or = [
       { brand: { $regex: escaped, $options: 'i' } },
       { brandSlug: { $regex: escaped, $options: 'i' } },
       { description: { $regex: escaped, $options: 'i' } },
@@ -35,39 +32,75 @@ export async function GET(req: NextRequest) {
     ];
   }
 
+  if (country) {
+    codeFilter.$or = codeFilter.$or || [];
+    codeFilter.$or.push({ scope: 'global' }, { country: country.toUpperCase() });
+  }
+
   if (category && category !== 'all') {
     const catSlugs = Object.entries(BRAND_CATEGORIES)
       .filter(([_, cat]) => cat === category)
       .map(([slug]) => slug);
     if (catSlugs.length > 0) {
-      matchFilter.brandSlug = { $in: catSlugs };
+      codeFilter.brandSlug = { $in: catSlugs };
     }
   }
 
-  const [results, total] = await Promise.all([
-    Code.find(matchFilter)
+  const [codeResults, codeTotal, offerResults] = await Promise.all([
+    Code.find(codeFilter)
       .sort({ upvotes: -1, createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .lean(),
-    Code.countDocuments(matchFilter),
+    Code.countDocuments(codeFilter),
+    escaped ? Offer.find({
+      status: 'published',
+      $or: [
+        { store_name: { $regex: escaped, $options: 'i' } },
+        { title: { $regex: escaped, $options: 'i' } },
+        { description: { $regex: escaped, $options: 'i' } },
+        { discount: { $regex: escaped, $options: 'i' } },
+        { code: { $regex: escaped, $options: 'i' } },
+      ],
+    })
+      .sort({ confidence: -1 })
+      .limit(10)
+      .lean() : [],
   ]);
 
-  const brandMap = new Map<string, { slug: string; name: string; codes: any[]; category: string }>();
-  for (const code of results) {
+  const brandMap = new Map<string, { slug: string; name: string; codes: any[]; offers: any[]; category: string }>();
+  for (const code of codeResults) {
     const slug = (code as any).brandSlug;
     if (!brandMap.has(slug)) {
       brandMap.set(slug, {
         slug,
         name: (code as any).brand,
         codes: [],
+        offers: [],
         category: BRAND_CATEGORIES[slug] || 'Popular',
       });
     }
     brandMap.get(slug)!.codes.push(code);
   }
 
+  for (const offer of offerResults) {
+    const slug = ((offer as any).store_slug || (offer as any).store_name || '').toLowerCase().replace(/ /g, '-');
+    const name = (offer as any).store_name || '';
+    if (!brandMap.has(slug)) {
+      brandMap.set(slug, {
+        slug,
+        name,
+        codes: [],
+        offers: [],
+        category: BRAND_CATEGORIES[slug] || 'Popular',
+      });
+    }
+    brandMap.get(slug)!.offers.push(offer);
+  }
+
   const brands = Array.from(brandMap.values());
+
+  const total = codeTotal + offerResults.length;
 
   const didYouMean = q && total === 0
     ? Object.entries(BRAND_CATEGORIES)
@@ -85,7 +118,7 @@ export async function GET(req: NextRequest) {
     ? CATEGORIES.filter((c) => c.toLowerCase().includes(q.toLowerCase())).slice(0, 5)
     : [];
 
-  const matchedCategory = total === 0 && input.type === 'url' && input.extracted
+  const matchedCategory = codeTotal === 0 && input.type === 'url' && input.extracted
     ? (BRAND_CATEGORIES[input.extracted.slug] || 'Popular')
     : null;
 
@@ -93,7 +126,7 @@ export async function GET(req: NextRequest) {
     brands,
     total,
     page,
-    pages: Math.ceil(total / limit),
+    pages: Math.ceil(codeTotal / limit),
     didYouMean: didYouMean.slice(0, 4),
     categories: matchedCategories,
     query: q,

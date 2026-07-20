@@ -15,8 +15,10 @@ export async function POST(req: NextRequest) {
   const scriptPath = path.join(botDir, 'scan_single.py');
   const env = { ...process.env };
 
+  const pythonBin = path.join(botDir, 'venv', 'bin', 'python');
+
   try {
-    const output = execSync(`python "${scriptPath}" "${url}"`, {
+    const output = execSync(`"${pythonBin}" "${scriptPath}" "${url}"`, {
       cwd: botDir,
       env,
       timeout: 25000,

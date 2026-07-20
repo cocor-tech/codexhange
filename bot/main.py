@@ -11,10 +11,12 @@ from db import connect, close
 from client import create_shared_client
 from app.config import settings
 from app.models.deal import Deal
-from app.adapters import UrlPatternsAdapter, SitemapAdapter, HomepageAdapter, LinkDiscoveryAdapter, CrawlerAdapter
+from app.adapters.promocodes import PromoCodesAdapter
+from app.adapters.couponbind import CouponBindAdapter
 from app.publishers.mongo import build_document, insert_blocked
+from app.workers.enricher import load_provider, enrich_batch
 
-ADAPTERS = [UrlPatternsAdapter(), SitemapAdapter(), HomepageAdapter(), LinkDiscoveryAdapter(), CrawlerAdapter()]
+ADAPTERS = [PromoCodesAdapter(), CouponBindAdapter()]
 SEMAPHORE = asyncio.Semaphore(settings.CONCURRENCY)
 
 def write_log(db, name, status, found=0, submitted=0, error=""):
@@ -43,10 +45,10 @@ async def process_website(db, site, client):
         write_log(db, brand_name, "unreachable")
         return
 
-    args = ({"brandId": str(wid), "brandName": brand_name, "website": url},)
+    brand_data = {"brandId": str(wid), "brandName": brand_name, "website": url}
     try:
         results = await asyncio.wait_for(
-            asyncio.gather(*[a.discover(*args) for a in ADAPTERS], return_exceptions=True), timeout=30.0)
+            asyncio.gather(*[a.discover(brand_data, client) for a in ADAPTERS], return_exceptions=True), timeout=30.0)
     except asyncio.TimeoutError:
         print(f"  {Fore.RED}[-] {brand_name:<20} timeout{Style.RESET_ALL}")
         write_log(db, brand_name, "timeout"); return
@@ -95,6 +97,21 @@ async def process_website(db, site, client):
         doc["websiteId"] = wid
         db.offers.insert_one(doc)
         submitted += 1
+
+    if submitted > 0:
+        try:
+            provider = load_provider(db)
+            if not isinstance(provider, NullProvider):
+                to_enrich = list(db.offers.find({"websiteId": wid, "status": {"$ne": "published"}}).limit(50))
+                if to_enrich:
+                    enriched = await enrich_batch(to_enrich, provider)
+                    for e in enriched:
+                        db.offers.update_one({"_id": e["_id"]}, {"$set": {
+                            "title": e.get("title"), "deal_type": e.get("deal_type"),
+                            "tags": e.get("tags", []), "enriched": True,
+                        }})
+        except:
+            pass
 
     db["websites"].update_one({"_id": wid}, {"$set": {"stats.last_scan": now, "stats.offers_found": submitted}})
     write_log(db, brand_name, "success", found=len(raw), submitted=submitted)

@@ -36,13 +36,15 @@ export default function ScannerPage() {
 
   const addLog = (msg: string) => setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
 
+  const normalizeUrl = (u: string) => {
+    if (!u.startsWith('http://') && !u.startsWith('https://')) return `https://${u}`;
+    return u;
+  };
+
   const scan = async (targetUrl?: string) => {
-    const url = targetUrl || inputUrl.trim() || (selectedBrand ? brands.find(b => b._id === selectedBrand)?.website : '');
+    let url = targetUrl || inputUrl.trim() || (selectedBrand ? brands.find(b => b._id === selectedBrand)?.website : '');
     if (!url) return;
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      addLog('Please enter a valid URL (include http:// or https://)');
-      return;
-    }
+    url = normalizeUrl(url);
 
     setScanning(true);
     setLogs([]);

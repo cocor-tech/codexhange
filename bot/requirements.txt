@@ -9,3 +9,7 @@ playwright>=1.61
 tldextract>=5.0
 rapidfuzz>=3.0
 dateparser>=1.0
+colorama>=0.4
+fake_useragent>=2.0
+cloudscraper>=1.2
+playwright-stealth>=2.0
