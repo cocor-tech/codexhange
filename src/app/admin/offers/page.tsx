@@ -65,7 +65,10 @@ export default function OffersPage() {
         {/* Search bar */}
         <div className="glass-card p-3 mb-4">
           <div className="flex gap-2">
-            <input value={searchInput} onChange={e => setSearchInput(e.target.value)}
+            <input value={searchInput} onChange={e => {
+                setSearchInput(e.target.value);
+                if (!e.target.value) { setSearch(''); setPage(1); }
+              }}
               onKeyDown={e => e.key === 'Enter' && doSearch()}
               placeholder="Search by store name, URL, code, title..."
               className="input-glass flex-1 px-3 py-2 text-sm" />
