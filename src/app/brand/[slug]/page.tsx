@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import { getCategory, getDidYouMean, CATEGORY_BRANDS, BRAND_CATEGORIES } from '@/lib/brands';
 import { ShareButton } from '@/components/codes/ShareButton';
 import { OfferVoteButtons } from '@/components/offers/VoteButtons';
+import { CopyButton } from '@/components/offers/CopyButton';
 
 interface Props {
   params: { slug: string };
@@ -147,6 +148,7 @@ export default async function BrandPage({ params }: Props) {
                       style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
                       {o.code}
                     </code>
+                    <CopyButton text={o.code} />
                   </div>
                 ) : (
                   <a href={o.sourceUrl || '#'} target="_blank" rel="nofollow noopener noreferrer"
