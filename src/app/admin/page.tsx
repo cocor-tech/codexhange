@@ -13,15 +13,15 @@ type SessionState = {
 };
 
 const NAV = [
-  { href: '/admin', label: 'Dashboard', icon: '◉' },
-  { href: '/admin/websites', label: 'Websites', icon: '◐' },
-  { href: '/admin/offers', label: 'Offers', icon: '◎' },
-  { href: '/admin/review', label: 'Review Queue', icon: '◈' },
-  { href: '/admin/scanner', label: 'Deal Scanner', icon: '◉' },
-  { href: '/admin/scan-jobs', label: 'Scan Jobs', icon: '◌' },
-  { href: '/admin/analytics', label: 'Analytics', icon: '◉' },
-  { href: '/admin/logs', label: 'Logs', icon: '◒' },
-  { href: '/admin/settings', label: 'Settings', icon: '◓' },
+  { href: '/admin', label: 'Dashboard', icon: '◉', desc: 'Overview & stats' },
+  { href: '/admin/websites', label: 'Websites', icon: '◐', desc: 'Manage sources' },
+  { href: '/admin/offers', label: 'Offers', icon: '◎', desc: 'All discovered deals' },
+  { href: '/admin/review', label: 'Review Queue', icon: '◈', desc: 'Pending approval' },
+  { href: '/admin/scanner', label: 'Deal Scanner', icon: '◉', desc: 'Scan any URL' },
+  { href: '/admin/scan-jobs', label: 'Scan Jobs', icon: '◌', desc: 'Track scans' },
+  { href: '/admin/analytics', label: 'Analytics', icon: '◉', desc: 'Charts & metrics' },
+  { href: '/admin/logs', label: 'Logs', icon: '◒', desc: 'Bot activity' },
+  { href: '/admin/settings', label: 'Settings', icon: '◓', desc: 'Configuration' },
 ];
 
 export default function AdminPage() {
@@ -180,7 +180,7 @@ export default function AdminPage() {
         </div>
         <nav className="p-3 space-y-1">
           {NAV.map(n => (
-            <Link key={n.href} href={n.href}
+            <Link key={n.href} href={n.href} onClick={() => setSidebarOpen(false)}
               className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-[var(--hover-overlay)]"
               style={{ color: 'var(--text-secondary)' }}>
               <span className="w-5 text-center text-xs opacity-60">{n.icon}</span>
@@ -232,12 +232,18 @@ export default function AdminPage() {
           {/* Nav cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {NAV.filter(n => n.href !== '/admin').map(n => (
-              <Link key={n.href} href={n.href}
-                className="glass-card p-4 hover:scale-[1.02] transition-transform block">
-                <p className="text-xs opacity-60 mb-1">{n.icon}</p>
-                <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{n.label}</h3>
-                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{n.desc || 'Manage'}</p>
-              </Link>
+              <div key={n.href} className="glass-card p-4 flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-xs opacity-60 mb-1">{n.icon}</p>
+                  <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{n.label}</h3>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{n.desc || 'Manage'}</p>
+                </div>
+                <Link href={n.href}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors hover:bg-[var(--hover-overlay)]"
+                  style={{ borderColor: 'var(--border)', color: 'var(--text-secondary)' }}>
+                  <span className="text-sm">→</span>
+                </Link>
+              </div>
             ))}
           </div>
         </div>

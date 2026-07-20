@@ -3,75 +3,147 @@
 import { useState, useEffect } from 'react';
 
 export default function AnalyticsPage() {
-  const [data, setData] = useState<any>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState<any>(null);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
-    setRefreshing(true);
+    setLoading(true);
     try {
-      const [offersRes, sitesRes, jobsRes, logsRes] = await Promise.all([
-        window.fetch('/api/admin/offers?limit=1').then(r => r.json()),
-        window.fetch('/api/admin/websites').then(r => r.json()),
-        window.fetch('/api/admin/scan-jobs?limit=1').then(r => r.json()),
-        window.fetch('/api/admin/logs').then(r => r.json()),
+      const [s, l] = await Promise.all([
+        window.fetch('/api/admin/stats').then(r => r.json()),
+        window.fetch('/api/admin/logs').then(r => r.json().catch(() => ({ logs: [] }))),
       ]);
-      setData({
-        totalOffers: offersRes.total || 0,
-        totalSites: sitesRes.total || 0,
-        totalJobs: jobsRes.total || 0,
-        logs: logsRes.logs || [],
-      });
+      setStats(s);
+      setLogs(l.logs || []);
     } catch {}
-    setRefreshing(false);
+    setLoading(false);
   };
 
   useEffect(() => { load(); }, []);
 
-  const successRate = data?.logs?.length
-    ? Math.round((data.logs.filter((l: any) => l.status === 'success').length / data.logs.length) * 100)
-    : 0;
+  if (loading) return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-bg-base)' }}>
+    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+  </div>;
+
+  const total = stats ? Object.values(stats as Record<string, any>).reduce((a: number, b: any) => a + (typeof b === 'number' ? b : 0), 0) : 0;
+  const successLogs = logs.filter(l => l.status === 'success').length;
+  const failedLogs = logs.filter(l => l.status !== 'success').length;
+  const successRate = logs.length > 0 ? Math.round((successLogs / logs.length) * 100) : 0;
+
+  const chartData = [
+    { label: 'Published', value: parseInt(stats?.publishedOffers || '0'), color: '#22c55e' },
+    { label: 'Pending', value: parseInt(stats?.pendingReview || '0'), color: '#f59e0b' },
+    { label: 'Blocked', value: parseInt(stats?.blockedSites || '0'), color: '#ef4444' },
+  ];
+  const chartTotal = chartData.reduce((a, c) => a + c.value, 0) || 1;
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-base)' }}>
-      <div className="mx-auto max-w-5xl px-6 py-6">
+      <div className="mx-auto max-w-6xl px-6 py-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Analytics</h1>
-          <div className="flex gap-2 items-center">
-            <button onClick={load} disabled={refreshing} className="btn-glass px-3 py-1.5 text-xs">{refreshing ? 'Refreshing…' : 'Refresh'}</button>
+          <div className="flex gap-2">
+            <button onClick={load} className="btn-glass px-3 py-1.5 text-xs">Refresh</button>
             <a href="/admin" className="text-xs hover:underline" style={{ color: 'var(--text-muted)' }}>← Dashboard</a>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-4 mb-6">
-          <MetricCard label="Total Websites" value={data?.totalSites || 0} color="#3b82f6" />
-          <MetricCard label="Total Offers" value={data?.totalOffers || 0} color="#22c55e" />
-          <MetricCard label="Scan Jobs" value={data?.totalJobs || 0} color="#a855f7" />
-          <MetricCard label="Success Rate" value={`${successRate}%`} color={successRate >= 60 ? '#22c55e' : '#f59e0b'} />
+        {/* Summary cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+          <MetricCard label="Offers" value={stats?.totalOffers || 0} color="#22c55e" />
+          <MetricCard label="Published" value={stats?.publishedOffers || 0} color="#22c55e" />
+          <MetricCard label="Brands" value={stats?.totalBrands || 0} color="#a855f7" />
+          <MetricCard label="Websites" value={stats?.totalWebsites || 0} color="#3b82f6" />
+          <MetricCard label="Categories" value={stats?.totalCategories || 0} color="#ec4899" />
+          <MetricCard label="User Codes" value={stats?.totalCodes || 0} color="#3b82f6" />
+          <MetricCard label="Clicks" value={stats?.totalClicks || 0} color="#f59e0b" />
+          <MetricCard label="Upvotes/Down" value={`${stats?.totalUpvotes || 0}/${stats?.totalDownvotes || 0}`} color="#22c55e" />
         </div>
 
-        <div className="glass-card p-5 mb-6">
-          <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Recent Activity</h2>
-          <div className="space-y-1">
-            {(data?.logs || []).slice(0, 15).map((l: any) => (
-              <div key={l._id} className="flex items-center gap-3 text-xs py-1" style={{ color: 'var(--text-muted)' }}>
-                <span style={{ color: l.status === 'success' ? '#22c55e' : l.status === 'timeout' ? '#ef4444' : '#f59e0b' }}>●</span>
-                <span className="w-24">{l.scanned_at ? new Date(l.scanned_at).toLocaleTimeString() : ''}</span>
-                <span className="w-28 truncate font-semibold" style={{ color: 'var(--text-primary)' }}>{l.brand_name}</span>
-                <span>{l.status}</span>
-                <span>{l.offers_found > 0 ? `${l.offers_found} offers` : ''}</span>
+        {/* Pie chart */}
+        <div className="grid gap-6 lg:grid-cols-2 mb-6">
+          <div className="glass-card p-5">
+            <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Offer Status Distribution</h2>
+            <div className="flex items-center gap-6">
+              <div className="relative w-32 h-32">
+                <svg viewBox="0 0 36 36" className="w-32 h-32 -rotate-90">
+                  {chartData.reduce((acc, item, i) => {
+                    const pct = (item.value / chartTotal) * 100;
+                    const prevPct = acc.reduce((a: number, c: typeof item) => a + (c.value / chartTotal) * 100, 0);
+                    const offset = (prevPct / 100) * 283;
+                    const length = (pct / 100) * 283;
+                    if (item.value === 0) return acc;
+                    acc.push(
+                      <circle key={item.label} cx="18" cy="18" r="15.9" fill="none" stroke={item.color}
+                        strokeWidth="3" strokeDasharray={`${length} ${283 - length}`}
+                        strokeDashoffset={-offset} />
+                    );
+                    return acc;
+                  }, [] as any[])}
+                </svg>
               </div>
-            ))}
-            {(!data?.logs?.length) && <p className="text-xs py-4" style={{ color: 'var(--text-muted)' }}>No activity yet. Add a website and run a scan.</p>}
+              <div className="space-y-2">
+                {chartData.map(d => (
+                  <div key={d.label} className="flex items-center gap-2 text-xs">
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: d.color }} />
+                    <span style={{ color: 'var(--text-secondary)' }}>{d.label}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{d.value} ({Math.round((d.value / chartTotal) * 100)}%)</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Bot success rate */}
+          <div className="glass-card p-5">
+            <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Bot Scan Success Rate</h2>
+            <div className="flex items-center gap-4">
+              <div className="relative w-24 h-24">
+                <svg viewBox="0 0 36 36" className="w-24 h-24 -rotate-90">
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--bg-secondary)" strokeWidth="3" />
+                  <circle cx="18" cy="18" r="15.9" fill="none" stroke={successRate >= 60 ? '#22c55e' : '#f59e0b'}
+                    strokeWidth="3" strokeDasharray={`${(successRate / 100) * 283} ${283 - (successRate / 100) * 283}`} />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-lg font-bold" style={{ color: successRate >= 60 ? '#22c55e' : '#f59e0b' }}>{successRate}%</span>
+                </div>
+              </div>
+              <div className="text-xs space-y-1" style={{ color: 'var(--text-muted)' }}>
+                <p><span style={{ color: '#22c55e' }}>{successLogs}</span> successful</p>
+                <p><span style={{ color: '#ef4444' }}>{failedLogs}</span> failed</p>
+                <p><span style={{ color: 'var(--text-secondary)' }}>{logs.length}</span> total scans</p>
+              </div>
+            </div>
           </div>
         </div>
 
+        {/* Bar chart */}
+        <div className="glass-card p-5 mb-6">
+          <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Platform Overview</h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <BarChart label="Brands" value={parseInt(stats?.totalBrands || '0')} max={Math.max(parseInt(stats?.totalBrands || '1'), 1)} color="#a855f7" />
+            <BarChart label="Websites" value={parseInt(stats?.totalWebsites || '0')} max={Math.max(parseInt(stats?.totalBrands || '1'), 1)} color="#3b82f6" />
+            <BarChart label="Offers" value={parseInt(stats?.totalOffers || '0')} max={Math.max(parseInt(stats?.totalOffers || '1'), 1)} color="#22c55e" />
+            <BarChart label="User Codes" value={parseInt(stats?.totalCodes || '0')} max={Math.max(parseInt(stats?.totalCodes || '1'), 1)} color="#f59e0b" />
+          </div>
+        </div>
+
+        {/* Recent activity */}
         <div className="glass-card p-5">
-          <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Status Distribution</h2>
-          <div className="space-y-3">
-            <BarRow label="Websites" value={data?.totalSites || 0} max={Math.max(data?.totalSites || 1, 1)} color="#3b82f6" />
-            <BarRow label="Offers" value={data?.totalOffers || 0} max={Math.max(data?.totalOffers || 1, 1)} color="#22c55e" />
-            <BarRow label="Scan Jobs" value={data?.totalJobs || 0} max={Math.max(data?.totalJobs || 1, 1)} color="#a855f7" />
-            <BarRow label="Success Rate" value={successRate} max={100} color={successRate >= 60 ? '#22c55e' : '#f59e0b'} suffix="%" />
+          <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Recent Bot Activity</h2>
+          <div className="space-y-1 max-h-60 overflow-y-auto">
+            {logs.slice(0, 30).map((l: any) => (
+              <div key={l._id} className="flex items-center gap-3 text-xs py-1" style={{ color: 'var(--text-muted)' }}>
+                <span style={{ color: l.status === 'success' ? '#22c55e' : '#ef4444' }}>●</span>
+                <span className="w-20 shrink-0">{l.scanned_at ? new Date(l.scanned_at).toLocaleDateString() : ''}</span>
+                <span className="w-24 truncate font-medium" style={{ color: 'var(--text-primary)' }}>{l.brand_name || '?'}</span>
+                <span>{l.status}</span>
+                {l.offers_found > 0 && <span className="text-green-500">{l.offers_found} offers</span>}
+                {l.error && <span className="truncate max-w-[200px]" style={{ color: '#ef4444' }}>{l.error}</span>}
+              </div>
+            ))}
+            {logs.length === 0 && <p className="text-xs py-4" style={{ color: 'var(--text-muted)' }}>No bot activity yet.</p>}
           </div>
         </div>
       </div>
@@ -82,21 +154,21 @@ export default function AnalyticsPage() {
 function MetricCard({ label, value, color }: { label: string; value: string | number; color: string }) {
   return (
     <div className="glass-card p-4">
-      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{label}</p>
+      <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{label}</p>
       <p className="text-2xl font-bold mt-1" style={{ color }}>{value}</p>
     </div>
   );
 }
 
-function BarRow({ label, value, max, color, suffix = '' }: { label: string; value: number; max: number; color: string; suffix?: string }) {
+function BarChart({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
   const pct = Math.min((value / max) * 100, 100);
   return (
     <div>
       <div className="flex justify-between text-xs mb-1" style={{ color: 'var(--text-muted)' }}>
         <span>{label}</span>
-        <span>{value}{suffix}</span>
+        <span>{value}</span>
       </div>
-      <div className="h-2 rounded-full" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+      <div className="h-3 rounded-full" style={{ backgroundColor: 'var(--bg-secondary)' }}>
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
     </div>
