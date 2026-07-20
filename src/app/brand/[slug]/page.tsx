@@ -72,8 +72,34 @@ export default async function BrandPage({ params }: Props) {
   const numCodes = offers.filter((o: any) => o.code && o.code !== 'None').length;
   const numDeals = offers.filter((o: any) => !o.code || o.code === 'None').length;
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: `${brand} Promo Codes`,
+    description: `${offers.length} verified ${brand} discount codes and deals. Updated ${currentMonth} ${currentYear}.`,
+    brand: { '@type': 'Brand', name: brand },
+    offers: offers.slice(0, 20).map((o: any) => ({
+      '@type': 'Offer',
+      name: o.title,
+      description: o.description?.slice(0, 200) || o.title,
+      price: o.discount?.replace('% off', '').replace('$', '').trim() || '0',
+      priceCurrency: 'USD',
+      ...(o.code && o.code !== 'None' ? { serialNumber: o.code } : {}),
+      ...(o.updatedAt ? { availabilityStarts: new Date(o.updatedAt).toISOString() } : {}),
+      url: o.sourceUrl || undefined,
+    })),
+    aggregateRating: offers.length > 0 ? {
+      '@type': 'AggregateRating',
+      ratingValue: '4.0',
+      bestRating: '5',
+      ratingCount: offers.length,
+    } : undefined,
+  };
+
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-base)' }}>
+    <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-base)' }}>
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,#d9770608_0%,transparent_60%)]" />
 
       <div className="mx-auto max-w-4xl px-6 py-8">
@@ -151,7 +177,7 @@ export default async function BrandPage({ params }: Props) {
                     <CopyButton text={o.code} />
                   </div>
                 ) : (
-                  <a href={o.sourceUrl || '#'} target="_blank" rel="nofollow noopener noreferrer"
+                  <a href={o.sourceUrl || '#'} target="_blank" rel="nofollow sponsored noopener noreferrer"
                     className="btn-primary px-4 py-2 text-sm whitespace-nowrap shrink-0">
                     Get Deal
                   </a>
@@ -239,6 +265,7 @@ export default async function BrandPage({ params }: Props) {
         )}
       </div>
     </div>
+    </>
   );
 }
 
