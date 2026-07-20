@@ -83,7 +83,7 @@ async def process_website(db, site, client):
 
     for rd in best.values():
         deal = Deal(store_name=brand_name, deal_type="sale",
-            code=rd.get("codes", [None])[0] if rd.get("codes") else None,
+            code=rd.get("code") or (rd.get("codes", [None])[0] if rd.get("codes") else None),
             title=str(rd.get("title") or f"{brand_name} offer"),
             description=str(rd.get("description") or ""),
             destination_url=str(rd["sourceUrl"]),

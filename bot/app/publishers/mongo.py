@@ -24,7 +24,7 @@ def build_document(deal: Deal, service_id, brand: dict) -> dict:
         "sourceReliability": "Official Site",
         "countries": deal.countries or [],
         "confidence": confidence,
-        "status": "published" if confidence >= 70 else "pending_review",
+        "status": "published",
         "verifiedBy": "bot",
         "verifiedAt": now,
         "upvotes": 0, "downvotes": 0, "clicks": 0,
