@@ -1,5 +1,8 @@
 import Link from 'next/link';
+import { Logo } from '@/components/Logo';
 import { SearchBar } from '@/components/landing/SearchBar';
+import { RegionSelector } from '@/components/landing/RegionSelector';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { connectDB } from '@/lib/mongoose';
 import Brand from '@/lib/models/Brand';
 import Offer from '@/lib/models/Offer';
@@ -66,8 +69,17 @@ export default async function HomePage() {
     <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-base)' }}>
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,#d9770608_0%,transparent_60%)]" />
 
+      {/* HEADER */}
+      <header className="relative z-10 mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+        <Logo href="/" className="text-base" />
+        <div className="flex items-center gap-2 sm:gap-3">
+          <RegionSelector />
+          <ThemeToggle />
+        </div>
+      </header>
+
       {/* HERO */}
-      <section className="relative z-10 mx-auto max-w-3xl px-6 pt-20 pb-12 text-center">
+      <section className="relative z-10 mx-auto max-w-3xl px-6 pt-10 pb-12 text-center">
         <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl" style={{ color: 'var(--text-primary)' }}>
           Find Promo Codes &amp; Deals
         </h1>
