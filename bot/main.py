@@ -13,11 +13,11 @@ from app.config import settings
 from app.models.deal import Deal
 from app.adapters.promocodes import PromoCodesAdapter
 from app.adapters.couponbind import CouponBindAdapter
-from app.adapters.promocodes_pw import PromoCodesPWAdapter
+from app.adapters.groupon import GrouponAdapter
 from app.publishers.mongo import build_document, insert_blocked
 from app.workers.enricher import load_provider, enrich_batch
 
-ADAPTERS = [PromoCodesAdapter(), CouponBindAdapter(), PromoCodesPWAdapter()]
+ADAPTERS = [PromoCodesAdapter(), CouponBindAdapter(), GrouponAdapter()]
 SEMAPHORE = asyncio.Semaphore(settings.CONCURRENCY)
 
 def write_log(db, name, status, found=0, submitted=0, error=""):
