@@ -114,15 +114,23 @@ async def main():
 
         done += len(batch) - len(valid)
 
-        # Save progress every 100
-        if (i + BATCH_SIZE) % 100 == 0:
-            with open(PROGRESS_FILE, "w") as f:
-                f.write(str(i + BATCH_SIZE))
-            total = db.offers.count_documents({"status": "published"})
+        # Save progress every 50
+        if (i + BATCH_SIZE) % 50 == 0:
+            total_offers = db.offers.count_documents({"status": "published"})
             elapsed = time.time() - start_time
             rate = (i + BATCH_SIZE) / elapsed if elapsed > 0 else 0
             remaining = (len(all_slugs) - i - BATCH_SIZE) / rate if rate > 0 else 0
-            print(f"\nProgress: {i+BATCH_SIZE}/{len(all_slugs)} | Found: {total} offers | ETA: {remaining/60:.1f}min\n")
+            db.scan_progress.update_one(
+                {"_id": "full_scan"},
+                {"$set": {
+                    "total": len(all_slugs), "done": i + BATCH_SIZE,
+                    "offers": total_offers, "status": "running",
+                    "eta_min": round(remaining / 60, 1),
+                    "updated_at": datetime.now(timezone.utc),
+                }},
+                upsert=True,
+            )
+            print(f"\nProgress: {i+BATCH_SIZE}/{len(all_slugs)} | Found: {total_offers} offers | ETA: {remaining/60:.1f}min\n")
 
     # Final
     with open(PROGRESS_FILE, "w") as f:

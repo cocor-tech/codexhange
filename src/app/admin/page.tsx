@@ -38,6 +38,7 @@ export default function AdminPage() {
   const [stats, setStats] = useState<Record<string, string>>({});
   const [otpCooldown, setOtpCooldown] = useState(0);
   const [actionMsg, setActionMsg] = useState('');
+  const [scanProgress, setScanProgress] = useState<any>(null);
 
   const msg = (s: string) => { setActionMsg(s); setTimeout(() => setActionMsg(''), 4000); };
 
@@ -77,7 +78,18 @@ export default function AdminPage() {
   };
 
   useEffect(() => { checkSession(); }, []);
-  useEffect(() => { if (session.authenticated) fetchStats(); }, [session.authenticated]);
+  useEffect(() => { if (session.authenticated) { fetchStats(); } }, [session.authenticated]);
+
+  useEffect(() => {
+    if (!session.authenticated) return;
+    const fetchProgress = async () => {
+      const res = await window.fetch('/api/admin/scan-progress');
+      if (res.ok) setScanProgress(await res.json());
+    };
+    fetchProgress();
+    const interval = setInterval(fetchProgress, 5000);
+    return () => clearInterval(interval);
+  }, [session.authenticated]);
 
   const loginWithPassword = async () => {
     if (session.locked) return;
@@ -228,6 +240,29 @@ export default function AdminPage() {
             <StatCard label="Downvotes" value={stats.totalDownvotes || '0'} sub="Negative feedback" color="#ef4444" />
             <StatCard label="Users" value={stats.totalUsers || '0'} sub="Admin accounts" color="#6b7280" />
           </div>
+
+          {/* Scan progress */}
+          {scanProgress?.status === 'running' && (
+            <div className="glass-card p-4 mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                  Full Scan <span className="text-xs font-normal" style={{ color: '#22c55e' }}>● Running</span>
+                </h3>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  ETA: {scanProgress.eta_min}min · {scanProgress.offers} offers found
+                </span>
+              </div>
+              <div className="h-2 rounded-full" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                <div className="h-full rounded-full transition-all duration-1000" style={{
+                  width: `${Math.min((scanProgress.done / scanProgress.total) * 100, 100)}%`,
+                  backgroundColor: '#22c55e'
+                }} />
+              </div>
+              <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                {scanProgress.done.toLocaleString()} / {scanProgress.total.toLocaleString()} stores checked
+              </p>
+            </div>
+          )}
 
           {/* Nav cards */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
