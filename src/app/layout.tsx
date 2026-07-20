@@ -12,9 +12,10 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
+  icons: [{ rel: 'icon', url: '/favicon.svg', type: 'image/svg+xml' }],
   title: {
-    default: '⚡ CodeXhange — Active Promo Codes & Discounts | Community Verified',
-    template: '%s | ⚡ CodeXhange',
+    default: 'CodeXhange — Active Promo Codes & Discounts | Community Verified',
+    template: '%s | CodeXhange',
   },
   description: 'Find working promo codes and discount codes verified by real shoppers. Community-rated deals for thousands of brands. No login required to browse.',
   keywords: ['promo codes', 'discount codes', 'coupon codes', 'deals', 'savings', 'community verified'],
