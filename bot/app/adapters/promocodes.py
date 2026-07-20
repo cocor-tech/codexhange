@@ -1,7 +1,6 @@
 """
-Adapter for promocodes.com — extracts actual promo codes from coupon detail pages.
-Step 1: Get offers list from brand page (includes couponId)
-Step 2: For each code-less offer, fetch coupon detail page to get the real code
+Adapter for promocodes.com — extracts promo code data from brand pages.
+Codes visible in Next.js page data are kept; non-code deals are stored as sale links.
 """
 
 import re, json, httpx
@@ -57,19 +56,12 @@ class PromoCodesAdapter:
                 expires = o.get("expirationDate", None) or None
                 coupon_type = int(o.get("couponTypeId", 0))
 
-                deal_type = "code"
-                if coupon_type == 14:
-                    deal_type = "sale"
-                elif not code:
-                    deal_type = "sale"
-
                 final_code = code or None
-                final_type = "code" if final_code else deal_type
+                final_type = "code" if final_code else ("sale" if coupon_type == 14 else "code")
+                if not final_code and not code:
+                    final_type = "sale"
 
                 brand_website = brand.get("website", "") or f"https://{slug.lower()}.com"
-                source_url = f"{BASE}/{quote(slug.lower())}"
-                detail_url = f"{source_url}?offer={coupon_id or 0}"
-
                 final_url = f"{brand_website}#offer={coupon_id or 0}"
 
                 entry = {
