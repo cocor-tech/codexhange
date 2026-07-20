@@ -10,6 +10,8 @@ export async function GET(req: NextRequest) {
   const offerId = searchParams.get('offerId');
   const serviceId = searchParams.get('serviceId');
   const status = searchParams.get('status');
+  const dealType = searchParams.get('deal_type');
+  const q = searchParams.get('q');
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '50');
 
@@ -26,6 +28,18 @@ export async function GET(req: NextRequest) {
   if (serviceId) filter.serviceId = serviceId;
   if (websiteId) filter.websiteId = websiteId;
   if (status) filter.status = status;
+  if (dealType) filter.deal_type = dealType;
+  if (q) {
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    filter.$or = [
+      { store_name: { $regex: escaped, $options: 'i' } },
+      { title: { $regex: escaped, $options: 'i' } },
+      { sourceUrl: { $regex: escaped, $options: 'i' } },
+      { code: { $regex: escaped, $options: 'i' } },
+      { discount: { $regex: escaped, $options: 'i' } },
+      { description: { $regex: escaped, $options: 'i' } },
+    ];
+  }
 
   const [offers, total] = await Promise.all([
     Offer.aggregate([
