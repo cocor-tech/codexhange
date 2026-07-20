@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
-
-type Tab = 'overview' | 'categories' | 'brands' | 'services' | 'offers' | 'pending' | 'users' | 'logs';
+import Link from 'next/link';
 
 type SessionState = {
   authenticated: boolean;
@@ -13,9 +12,20 @@ type SessionState = {
   locked?: boolean;
 };
 
+const NAV = [
+  { href: '/admin', label: 'Dashboard', icon: '◉' },
+  { href: '/admin/websites', label: 'Websites', icon: '◐' },
+  { href: '/admin/offers', label: 'Offers', icon: '◎' },
+  { href: '/admin/review', label: 'Review Queue', icon: '◈' },
+  { href: '/admin/scanner', label: 'Deal Scanner', icon: '◉' },
+  { href: '/admin/scan-jobs', label: 'Scan Jobs', icon: '◌' },
+  { href: '/admin/analytics', label: 'Analytics', icon: '◉' },
+  { href: '/admin/logs', label: 'Logs', icon: '◒' },
+  { href: '/admin/settings', label: 'Settings', icon: '◓' },
+];
+
 export default function AdminPage() {
-  const [tab, setTab] = useState<Tab>('overview');
-  const [actionMsg, setActionMsg] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [session, setSession] = useState<SessionState>({ authenticated: false, loading: true });
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,25 +35,20 @@ export default function AdminPage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [stats, setStats] = useState<Record<string,string>>({});
+  const [stats, setStats] = useState<Record<string, string>>({});
   const [otpCooldown, setOtpCooldown] = useState(0);
+  const [actionMsg, setActionMsg] = useState('');
 
   const msg = (s: string) => { setActionMsg(s); setTimeout(() => setActionMsg(''), 4000); };
-  const clearMsg = () => setActionMsg('');
 
   const checkSession = async () => {
     const token = window.localStorage.getItem('admin_token');
-    if (!token) {
-      setSession({ authenticated: false, loading: false });
-      return;
-    }
-
+    if (!token) { setSession({ authenticated: false, loading: false }); return; }
     const res = await window.fetch('/api/admin/session', { headers: { Authorization: `Bearer ${token}` } });
     if (res.ok) {
       const data = await res.json();
       setSession({ authenticated: data.authenticated, email: data.email, loading: false, locked: data.locked });
-      if (data.locked) window.localStorage.removeItem('admin_token');
-      if (!data.authenticated && !data.locked) window.localStorage.removeItem('admin_token');
+      if (data.locked || !data.authenticated) window.localStorage.removeItem('admin_token');
     } else {
       setSession({ authenticated: false, loading: false });
       window.localStorage.removeItem('admin_token');
@@ -53,176 +58,108 @@ export default function AdminPage() {
   const fetchStats = async () => {
     const res = await window.fetch('/api/admin/stats');
     if (res.ok) {
-      const data = await res.json();
-      setStats({ pendingReview: String(data.pendingReview ?? '—'), totalBrands: String(data.totalBrands ?? '—'), totalOffers: String(data.totalOffers ?? '—'), totalUsers: String(data.totalUsers ?? '—') });
+      const d = await res.json();
+      setStats({
+        pendingReview: String(d.pendingReview ?? '—'),
+        totalBrands: String(d.totalBrands ?? '—'),
+        totalOffers: String(d.totalOffers ?? '—'),
+        totalUsers: String(d.totalUsers ?? '—'),
+        totalWebsites: String(d.totalWebsites ?? '0'),
+        totalCategories: String(d.totalCategories ?? '0'),
+        totalCodes: String(d.totalCodes ?? '0'),
+        publishedOffers: String(d.publishedOffers ?? '0'),
+        blockedSites: String(d.blockedSites ?? '0'),
+        totalClicks: String(d.totalClicks ?? '0'),
+        totalUpvotes: String(d.totalUpvotes ?? '0'),
+        totalDownvotes: String(d.totalDownvotes ?? '0'),
+      });
     }
   };
 
   useEffect(() => { checkSession(); }, []);
-
   useEffect(() => { if (session.authenticated) fetchStats(); }, [session.authenticated]);
 
   const loginWithPassword = async () => {
     if (session.locked) return;
-    setBusy(true);
-    setError('');
+    setBusy(true); setError('');
     try {
       const res = await window.fetch('/api/admin/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, action: 'login' }),
       });
-      let data: any = {};
-      try { data = await res.json(); } catch { data = { error: 'Server error — empty response' }; }
+      const data = await res.json();
       setBusy(false);
-      if (!res.ok) {
-        setError(data.error || 'Invalid credentials');
-        if (data.locked) {
-          setSession({ ...session, authenticated: false, locked: true });
-          setPassword('');
-        }
-        return;
-      }
+      if (!res.ok) { setError(data.error || 'Invalid credentials'); if (data.locked) setSession({ ...session, locked: true }); return; }
       setPassword('');
-      if (data.requiresOtp) {
-        setOtpRequired(true);
-        msg('Verification code sent');
-        if (data.devCode) console.info('Admin OTP dev code:', data.devCode);
-        return;
-      }
+      if (data.requiresOtp) { setOtpRequired(true); msg('OTP sent'); return; }
       window.localStorage.setItem('admin_token', data.token);
       setSession({ authenticated: true, email, loading: false });
-      msg('Signed in');
-    } catch (err) {
-      setBusy(false);
-      setError('Network error — could not reach server');
-    }
+    } catch { setBusy(false); setError('Network error'); }
+  };
+
+  const verifyOtp = async () => {
+    setBusy(true); setError('');
+    const res = await window.fetch('/api/admin/auth', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, otp, action: 'verify' }),
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) { setError(data.error || 'Invalid code'); return; }
+    window.localStorage.setItem('admin_token', data.token);
+    setSession({ authenticated: true, email, loading: false });
+    setOtpRequired(false); setOtp('');
   };
 
   const resendOtp = async () => {
     if (session.locked || otpCooldown > 0) return;
-    setError('');
     const res = await window.fetch('/api/admin/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, action: 'send' }),
     });
     const data = await res.json();
-    if (!res.ok) {
-      setError(data.error || 'Could not resend code');
-      return;
-    }
-    if (data.devCode) console.info('Admin OTP dev code:', data.devCode);
+    if (!res.ok) { setError(data.error || 'Could not resend'); return; }
     setOtpCooldown(30);
-    const interval = setInterval(() => setOtpCooldown(prev => { if (prev <= 1) { clearInterval(interval); return 0; } return prev - 1; }), 1000);
-    msg('Verification code resent');
-  };
-
-  const verifyOtp = async () => {
-    if (session.locked) return;
-    setBusy(true);
-    setError('');
-    try {
-      const res = await window.fetch('/api/admin/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otp, action: 'verify' }),
-      });
-      let data: any = {};
-      try { data = await res.json(); } catch { data = { error: 'Server error — empty response' }; }
-      setBusy(false);
-      if (!res.ok) {
-        setError(data.error || 'Invalid code');
-        return;
-      }
-      window.localStorage.setItem('admin_token', data.token);
-      setSession({ authenticated: true, email, loading: false });
-      setOtpRequired(false);
-      setOtp('');
-      msg('Signed in');
-    } catch (err) {
-      setBusy(false);
-      setError('Network error — could not reach server');
-    }
-  };
-
-  const changePassword = async () => {
-    setBusy(true);
-    setError('');
-    const token = window.localStorage.getItem('admin_token');
-    const res = await window.fetch('/api/admin/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-      body: JSON.stringify({ email: session.email, password: currentPassword, newPassword, action: 'change-password' }),
-    });
-    const data = await res.json();
-    setBusy(false);
-    if (!res.ok) {
-      setError(data.error || 'Could not update password');
-      return;
-    }
-    setNewPassword('');
-    setCurrentPassword('');
-    msg('Password updated');
+    const interval = setInterval(() => setOtpCooldown(p => { if (p <= 1) { clearInterval(interval); return 0; } return p - 1; }), 1000);
+    msg('OTP resent');
   };
 
   const logout = async () => {
     const token = window.localStorage.getItem('admin_token');
-    if (token) {
-      await window.fetch('/api/admin/session', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-    }
+    if (token) await window.fetch('/api/admin/session', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
     window.localStorage.removeItem('admin_token');
     setSession({ authenticated: false, loading: false });
-    setEmail('');
-    setPassword('');
-    setOtp('');
-    setOtpRequired(false);
+    setEmail(''); setPassword(''); setOtp(''); setOtpRequired(false);
   };
 
   if (session.loading) {
-    return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-bg-base)' }}><p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading admin access…</p></div>;
+    return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-bg-base)' }}>
+      <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</p>
+    </div>;
   }
 
   if (!session.authenticated) {
-    if (session.locked) {
-      return (
-        <div className="flex min-h-screen flex-col items-center justify-center px-4 text-center" style={{ backgroundColor: 'var(--color-bg-base)' }}>
-          <h1 className="text-6xl font-extrabold" style={{ color: '#f59e0b' }}>404</h1>
-          <p className="mt-4 text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Access unavailable</p>
-          <p className="mt-2 max-w-md text-sm" style={{ color: 'var(--text-secondary)' }}>
-            This sign-in attempt has been blocked after repeated failed tries. Please wait and try again later.
-          </p>
-          <div className="mt-8">
-            <button onClick={() => window.location.assign('/')} className="btn-primary px-5 py-2.5 text-sm">Go Home</button>
-          </div>
-        </div>
-      );
-    }
-
     return (
       <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: 'var(--color-bg-base)' }}>
-        <div className="glass-card max-w-md w-full">
-          <div className="flex items-center justify-between">
+        <div className="glass-card max-w-md w-full p-6">
+          <div className="flex items-center justify-between mb-6">
             <Logo href="/" className="text-base" />
             <ThemeToggle />
           </div>
-          <div className="mt-6">
-            <p className="text-xs uppercase tracking-[0.3em]" style={{ color: '#d97706' }}>Admin access</p>
-            <h1 className="mt-2 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Sign in with your email and password</h1>
-            <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>Enter the admin email and password for this workspace.</p>
-          </div>
+          <p className="text-xs uppercase tracking-[0.3em]" style={{ color: '#d97706' }}>Admin access</p>
+          <h1 className="mt-2 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Sign in</h1>
           <div className="mt-6 space-y-3">
-            <input disabled={session.locked} value={email} onChange={(e) => setEmail(e.target.value)} className="input-glass" placeholder="you@company.com" />
-            {!otpRequired && <input disabled={session.locked} type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="input-glass" placeholder="Password" />}
-            {otpRequired && <input disabled={session.locked} value={otp} onChange={(e) => setOtp(e.target.value)} className="input-glass" placeholder="Enter verification code" />}
+            <input value={email} onChange={e => setEmail(e.target.value)} className="input-glass w-full" placeholder="admin@codexhange.com" />
+            {!otpRequired && <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="input-glass w-full" placeholder="Password" />}
+            {otpRequired && <input value={otp} onChange={e => setOtp(e.target.value)} className="input-glass w-full" placeholder="OTP code" />}
             {error && <p className="text-sm" style={{ color: '#ef4444' }}>{error}</p>}
             {otpRequired ? (
               <div className="flex gap-2">
-                <button disabled={busy || !otp || session.locked} onClick={verifyOtp} className="btn-primary flex-1">{busy ? 'Verifying…' : 'Verify code'}</button>
-                <button disabled={busy || otpCooldown > 0 || session.locked} onClick={resendOtp} className="btn-glass px-3 text-xs whitespace-nowrap">{otpCooldown > 0 ? `${otpCooldown}s` : 'Resend'}</button>
+                <button disabled={busy || !otp} onClick={verifyOtp} className="btn-primary flex-1">{busy ? '…' : 'Verify'}</button>
+                <button disabled={busy || otpCooldown > 0} onClick={resendOtp} className="btn-glass px-3 text-xs">{otpCooldown > 0 ? `${otpCooldown}s` : 'Resend'}</button>
               </div>
             ) : (
-              <button disabled={busy || !email || !password || session.locked} onClick={loginWithPassword} className="btn-primary w-full">{busy ? 'Signing in…' : 'Sign in'}</button>
+              <button disabled={busy || !email || !password} onClick={loginWithPassword} className="btn-primary w-full">{busy ? '…' : 'Sign in'}</button>
             )}
           </div>
         </div>
@@ -231,74 +168,77 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-base)' }}>
-      <main className="mx-auto max-w-7xl px-6 pb-32 pt-6">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em]" style={{ color: '#d97706' }}>Offer Intelligence Platform</p>
-            <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Dashboard</h1>
+    <div className="min-h-screen flex" style={{ backgroundColor: 'var(--color-bg-base)' }}>
+      {/* Mobile overlay */}
+      {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+
+      {/* Sidebar */}
+      <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 transform transition-transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 border-r`} style={{ backgroundColor: 'var(--color-bg-base)', borderColor: 'var(--border)' }}>
+        <div className="flex items-center justify-between p-4 border-b" style={{ borderColor: 'var(--border)' }}>
+          <Logo href="/admin" className="text-sm" />
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-xs" style={{ color: 'var(--text-muted)' }}>✕</button>
+        </div>
+        <nav className="p-3 space-y-1">
+          {NAV.map(n => (
+            <Link key={n.href} href={n.href}
+              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-[var(--hover-overlay)]"
+              style={{ color: 'var(--text-secondary)' }}>
+              <span className="w-5 text-center text-xs opacity-60">{n.icon}</span>
+              {n.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t" style={{ borderColor: 'var(--border)' }}>
+          <button onClick={logout} className="flex items-center gap-2 text-xs" style={{ color: '#ef4444' }}>
+            Logout {session.email}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <main className="flex-1 min-w-0">
+        {/* Top bar */}
+        <header className="flex items-center justify-between px-4 py-3 border-b lg:hidden" style={{ borderColor: 'var(--border)' }}>
+          <button onClick={() => setSidebarOpen(true)} className="text-sm" style={{ color: 'var(--text-primary)' }}>☰</button>
+          <Logo href="/admin" className="text-sm" />
+          <ThemeToggle />
+        </header>
+
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em]" style={{ color: '#d97706' }}>Offer Intelligence</p>
+              <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Dashboard</h1>
+            </div>
+            <ThemeToggle />
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{session.email}</span>
-            <button onClick={logout} className="rounded-md px-3 py-1.5 text-xs font-medium border hover:bg-red-500/10" style={{ borderColor: 'var(--border)', color: '#ef4444' }}>Logout</button>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
+            <StatCard label="Websites" value={stats.totalWebsites || '0'} sub="Active sources" color="#3b82f6" />
+            <StatCard label="Offers" value={stats.totalOffers || '0'} sub="Total discovered" color="#22c55e" />
+            <StatCard label="Published" value={stats.publishedOffers || '0'} sub="Live on site" color="#22c55e" />
+            <StatCard label="Pending Review" value={stats.pendingReview || '0'} sub="Needs approval" color="#f59e0b" />
+            <StatCard label="Brands" value={stats.totalBrands || '0'} sub="In database" color="#a855f7" />
+            <StatCard label="Categories" value={stats.totalCategories || '0'} sub="Organized" color="#ec4899" />
+            <StatCard label="User Codes" value={stats.totalCodes || '0'} sub="Submitted" color="#3b82f6" />
+            <StatCard label="Blocked Sites" value={stats.blockedSites || '0'} sub="Cloudflare etc" color="#ef4444" />
+            <StatCard label="Clicks" value={stats.totalClicks || '0'} sub="On offers" color="#f59e0b" />
+            <StatCard label="Upvotes" value={stats.totalUpvotes || '0'} sub="Positive feedback" color="#22c55e" />
+            <StatCard label="Downvotes" value={stats.totalDownvotes || '0'} sub="Negative feedback" color="#ef4444" />
+            <StatCard label="Users" value={stats.totalUsers || '0'} sub="Admin accounts" color="#6b7280" />
           </div>
-        </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <a href="/admin/websites" className="glass-card p-5 hover:opacity-80 transition-opacity block">
-            <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Websites</p>
-            <div className="mt-2 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>0</div>
-            <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>Manage your sources</p>
-          </a>
-          <a href="/admin/offers" className="glass-card p-5 hover:opacity-80 transition-opacity block">
-            <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Offers</p>
-            <div className="mt-2 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{stats.totalOffers || '0'}</div>
-            <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>All discovered deals</p>
-          </a>
-          <a href="/admin/review" className="glass-card p-5 hover:opacity-80 transition-opacity block">
-            <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Review Queue</p>
-            <div className="mt-2 text-2xl font-bold" style={{ color: '#f59e0b' }}>{stats.pendingReview || '0'}</div>
-            <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>Pending approval</p>
-          </a>
-          <a href="/admin/scanner" className="glass-card p-5 hover:opacity-80 transition-opacity block">
-            <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Deal Scanner</p>
-            <div className="mt-2 text-2xl font-bold" style={{ color: '#22c55e' }}>🔍</div>
-            <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>Scan any URL instantly</p>
-          </a>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <NavCard href="/admin/websites" title="Websites" desc="Add, manage, and scan websites. This is where your sources live." color="#3b82f6" />
-          <NavCard href="/admin/offers" title="Offers" desc="Browse all discovered promo codes, sales, and free trials." color="#22c55e" />
-          <NavCard href="/admin/review" title="Review Queue" desc="Approve or reject pending offers before they go live." color="#f59e0b" />
-          <NavCard href="/admin/scan-jobs" title="Scan Jobs" desc="Track individual page scans and their status." color="#a855f7" />
-          <NavCard href="/admin/scanner" title="Deal Scanner" desc="Paste any URL and extract promo codes instantly." color="#8b5cf6" />
-          <NavCard href="/admin/analytics" title="Analytics" desc="Charts, metrics, and performance trends." color="#ec4899" />
-          <NavCard href="/admin/logs" title="Logs" desc="View bot scan history, errors, and activity." color="#6b7280" />
-          <NavCard href="/admin/settings" title="Settings" desc="Bot configuration, AI provider, publishing rules." color="#ec4899" />
-        </div>
-
-        <div className="glass-card p-5">
-          <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Recent Activity</h2>
-          <div className="space-y-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-            <p>Add a website to get started. Go to <a href="/admin/websites" className="underline" style={{ color: '#3b82f6' }}>Websites</a> to add your first source.</p>
-          </div>
-        </div>
-
-        <div className="mt-6 glass-card p-5">
-          <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Offer Intelligence Platform</h2>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Version 2.0 — Built with Python async scraper, Next.js admin panel, and MongoDB.
-            <a href="https://github.com/oraimoitel/codexhange" target="_blank" className="ml-2 underline" style={{ color: '#3b82f6' }}>GitHub</a>
-          </p>
-        </div>
-
-        <div className="mt-6 glass-card p-5">
-          <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Change admin password</h2>
-          <div className="flex flex-col gap-2 max-w-xs">
-            <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="input-glass px-3 py-2 text-sm" placeholder="Current password" />
-            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="input-glass px-3 py-2 text-sm" placeholder="New password" />
-            <button disabled={busy || !newPassword || !currentPassword} onClick={changePassword} className="btn-glass px-3 py-2 text-xs self-start">{busy ? 'Updating…' : 'Update password'}</button>
+          {/* Nav cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            {NAV.filter(n => n.href !== '/admin').map(n => (
+              <Link key={n.href} href={n.href}
+                className="glass-card p-4 hover:scale-[1.02] transition-transform block">
+                <p className="text-xs opacity-60 mb-1">{n.icon}</p>
+                <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{n.label}</h3>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{n.desc || 'Manage'}</p>
+              </Link>
+            ))}
           </div>
         </div>
       </main>
@@ -306,13 +246,12 @@ export default function AdminPage() {
   );
 }
 
-function NavCard({ href, title, desc, color }: { href: string; title: string; desc: string; color: string }) {
+function StatCard({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
   return (
-    <a href={href} className="glass-card p-5 hover:opacity-80 transition-opacity block">
-      <h3 className="text-sm font-bold" style={{ color }}>{title}</h3>
-      <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>{desc}</p>
-    </a>
+    <div className="glass-card p-4">
+      <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>{label}</p>
+      <p className="mt-1 text-2xl font-bold" style={{ color }}>{value}</p>
+      <p className="mt-0.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>{sub}</p>
+    </div>
   );
 }
-
-

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { getCategory, getDidYouMean, CATEGORY_BRANDS, BRAND_CATEGORIES } from '@/lib/brands';
 import { ShareButton } from '@/components/codes/ShareButton';
+import { OfferVoteButtons } from '@/components/offers/VoteButtons';
 
 interface Props {
   params: { slug: string };
@@ -137,6 +138,7 @@ export default async function BrandPage({ params }: Props) {
                     {o.updatedAt && <span>✓ Updated {timeAgo(new Date(o.updatedAt))}</span>}
                     {o.expiresAt && <span>⏱ Expires {new Date(o.expiresAt).toLocaleDateString()}</span>}
                     {o.code && o.code !== 'None' && <ShareButton code={o.code} brand={brand} brandSlug={slug} description={o.title} />}
+                    <OfferVoteButtons offerId={o._id.toString()} upvotes={o.upvotes || 0} downvotes={o.downvotes || 0} />
                   </div>
                 </div>
                 {o.code && o.code !== 'None' ? (
