@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     await clearAccountRate(email);
 
     const otpCode = generateOtp();
-    storeOtp(email, otpCode);
+    await storeOtp(email, otpCode);
     const mailResult = await sendOtpEmail(email, otpCode);
 
     return NextResponse.json({ ok: true, requiresOtp: true, message: mailResult.skipped ? 'OTP ready (mail not configured)' : 'OTP sent', devCode: otpCode });
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
     }
 
     const otpCode = generateOtp();
-    storeOtp(email, otpCode);
+    await storeOtp(email, otpCode);
     const mailResult = await sendOtpEmail(email, otpCode);
 
     return NextResponse.json({ ok: true, message: mailResult.skipped ? 'OTP ready (mail not configured)' : 'OTP sent', devCode: otpCode });
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'OTP is required' }, { status: 400 });
     }
 
-    const valid = verifyOtp(email, otp);
+    const valid = await verifyOtp(email, otp);
     if (!valid) {
       return NextResponse.json({ error: 'Invalid or expired OTP' }, { status: 401 });
     }

@@ -3,12 +3,6 @@ import bcrypt from 'bcryptjs';
 import User, { IUser } from '@/lib/models/User';
 import { connectDB } from '@/lib/mongoose';
 
-type OtpRecord = {
-  email: string;
-  otp: string;
-  expiresAt: number;
-};
-
 type FingerprintContext = {
   ip?: string;
   userAgent?: string;
@@ -18,7 +12,14 @@ type FingerprintContext = {
 const OTP_TTL_MS = 5 * 60 * 1000;
 const BCRYPT_ROUNDS = 12;
 
-const otpStore = new Map<string, OtpRecord>();
+let otpColl: any = null;
+async function getOtpCollection() {
+  if (!otpColl) {
+    const m = await connectDB();
+    otpColl = m.connection.collection('otps');
+  }
+  return otpColl;
+}
 
 function getJwtSecret(): string {
   return process.env.NEXTAUTH_SECRET || crypto.createHash('sha256').update(process.env.ADMIN_SEED_PASSWORD || 'fallback-secret').digest('hex');
@@ -43,13 +44,6 @@ export function buildFingerprint({ ip, userAgent, forwardedFor }: FingerprintCon
   return crypto.createHash('sha256').update(raw).digest('hex');
 }
 
-function pruneExpiredOtps() {
-  const now = Date.now();
-  for (const [key, value] of otpStore.entries()) {
-    if (value.expiresAt <= now) otpStore.delete(key);
-  }
-}
-
 export function generateOtp() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let otp = '';
@@ -59,29 +53,33 @@ export function generateOtp() {
   return otp;
 }
 
-export function storeOtp(email: string, otp: string) {
+export async function storeOtp(email: string, otp: string) {
   const normalized = normalizeEmail(email);
-  pruneExpiredOtps();
-  otpStore.set(normalized, {
-    email: normalized,
-    otp,
-    expiresAt: Date.now() + OTP_TTL_MS,
-  });
+  try {
+    const col = await getOtpCollection();
+    await col.deleteMany({ email: normalized });
+    await col.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+    await col.insertOne({
+      email: normalized,
+      otp,
+      expiresAt: new Date(Date.now() + OTP_TTL_MS),
+      createdAt: new Date(),
+    });
+  } catch {}
   return otp;
 }
 
-export function verifyOtp(email: string, otp: string) {
+export async function verifyOtp(email: string, otp: string) {
   const normalized = normalizeEmail(email);
-  pruneExpiredOtps();
-  const record = otpStore.get(normalized);
-  if (!record) return false;
-  if (record.expiresAt <= Date.now()) {
-    otpStore.delete(normalized);
-    return false;
-  }
-  const isValid = record.otp === otp;
-  if (isValid) otpStore.delete(normalized);
-  return isValid;
+  try {
+    const col = await getOtpCollection();
+    const record = await col.findOne({ email: normalized, otp, expiresAt: { $gt: new Date() } });
+    if (record) {
+      await col.deleteOne({ _id: record._id });
+      return true;
+    }
+  } catch {}
+  return false;
 }
 
 function signJwt(payload: Record<string, any>): string {
