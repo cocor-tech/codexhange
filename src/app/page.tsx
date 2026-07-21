@@ -40,9 +40,11 @@ async function getPopularBrands() {
       { $match: { status: 'published' } },
       { $group: { _id: '$store_name', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
-      { $limit: 12 },
+      { $limit: 50 },
     ]);
-    return brands.map(b => ({
+    // Randomize and pick 8
+    const shuffled = brands.sort(() => Math.random() - 0.5).slice(0, 8);
+    return shuffled.map(b => ({
       name: b._id,
       slug: b._id.toLowerCase().replace(/ /g, '-').replace(/[^a-z0-9-]/g, ''),
       offers: b.count,
@@ -177,7 +179,7 @@ export default async function HomePage() {
               <Link key={b.slug || i} href={`/brand/${b.slug}`}
                 className="rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:border-brand-500/50 hover:bg-brand-500/10"
                 style={{ borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
-                {b.name}
+                {b.name} <span className="text-[10px] opacity-50">→</span>
               </Link>
             ))}
           </div>

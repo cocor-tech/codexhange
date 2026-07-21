@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Poppins } from 'next/font/google';
 import { ToastProvider } from '@/components/ui/Toast';
 import { Navbar } from '@/components/Navbar';
+import { PageviewTracker } from '@/components/PageviewTracker';
 import Link from 'next/link';
 import { connectDB } from '@/lib/mongoose';
 import Offer from '@/lib/models/Offer';
@@ -80,6 +81,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           __html: `(function(){try{var t=localStorage.getItem('codexhange-theme');document.documentElement.className=t||'light'}catch(e){}})()`
         }} />
           <ToastProvider>
+          <PageviewTracker />
           <Navbar />
           <div className="flex-1">{children}</div>
           <footer className="border-t py-10 text-xs" style={{ borderColor: 'var(--border)', color: 'var(--text-muted)' }}>

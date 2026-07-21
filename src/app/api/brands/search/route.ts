@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongoose';
-import Code from '@/lib/models/Code';
-
-export const dynamic = 'force-dynamic';
+import Offer from '@/lib/models/Offer';
+import Brand from '@/lib/models/Brand';
 import { BRAND_CATEGORIES, CATEGORIES } from '@/lib/brands';
 import { classifyInput } from '@/lib/search';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   const rawQ = req.nextUrl.searchParams.get('q')?.trim();
@@ -13,79 +14,74 @@ export async function GET(req: NextRequest) {
   }
 
   const input = classifyInput(rawQ);
-  let q: string;
-
-  if (input.type === 'url' && input.extracted) {
-    q = input.extracted.slug;
-  } else {
-    q = rawQ.toLowerCase().replace(/[^a-z0-9\s-]/g, '');
-  }
+  const q = input.type === 'url' && input.extracted
+    ? input.extracted.slug
+    : rawQ.toLowerCase().replace(/[^a-z0-9\s-]/g, '');
 
   await connectDB();
 
   const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  const brandResults = await Code.aggregate([
-    {
-      $match: {
-        archived: false,
-        $or: [
-          { brandSlug: { $regex: escaped, $options: 'i' } },
-          { brand: { $regex: escaped, $options: 'i' } },
-          { description: { $regex: escaped, $options: 'i' } },
-        ],
-      },
-    },
-    {
-      $group: {
-        _id: { slug: '$brandSlug', name: '$brand' },
-        activeCodes: { $sum: 1 },
-      },
-    },
-    { $project: { _id: 0, slug: '$_id.slug', name: '$_id.name', activeCodes: 1 } },
-    { $sort: { activeCodes: -1 } },
-    { $limit: 5 },
+  // Search offers + brands in parallel
+  const [offerBrands, dbBrands] = await Promise.all([
+    Offer.aggregate([
+      { $match: { status: 'published', store_name: { $regex: escaped, $options: 'i' } } },
+      { $group: { _id: '$store_name', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 5 },
+    ]),
+    Brand.find({ active: true, name: { $regex: escaped, $options: 'i' } })
+      .select('name slug')
+      .limit(5)
+      .lean(),
   ]);
 
-  const matchedCategories = CATEGORIES.filter((c) => c.toLowerCase().includes(q.toLowerCase())).slice(0, 3);
+  const brandItems = [
+    ...offerBrands.map((b: any) => ({
+      slug: b._id.toLowerCase().replace(/ /g, '-').replace(/[^a-z0-9-]/g, ''),
+      name: b._id,
+      activeCodes: b.count,
+    })),
+    ...(dbBrands as any[]).map(b => ({
+      slug: b.slug,
+      name: b.name,
+      activeCodes: 0,
+    })),
+  ];
 
-  const brandSlugs = brandResults.map((b: any) => b.slug);
-  const categorySlugs = matchedCategories
-    .flatMap((c) => {
-      const slugs = Object.entries(BRAND_CATEGORIES)
-        .filter(([_, cat]) => cat === c)
-        .map(([slug]) => slug);
-      return slugs.filter((s) => !brandSlugs.includes(s));
-    })
-    .slice(0, 4);
+  // Dedup by slug
+  const seen = new Set();
+  const uniqueBrands = brandItems.filter(b => {
+    if (seen.has(b.slug)) return false;
+    seen.add(b.slug);
+    return true;
+  }).slice(0, 5);
+
+  const matchedCategories = CATEGORIES.filter(c => c.toLowerCase().includes(q.toLowerCase())).slice(0, 3);
 
   const suggestions = [
     ...(input.type === 'url' && input.extracted
-      ? [
-          {
-            type: 'brand' as const,
-            label: '🔗 Link Detected',
-            items: [{ slug: input.extracted.slug, name: input.extracted.brand, activeCodes: brandResults.find((b: any) => b.slug === input.extracted?.slug)?.activeCodes || 0 }],
-          },
-        ]
+      ? [{
+          type: 'brand' as const,
+          label: '🔗 Link Detected',
+          items: [{ slug: input.extracted.slug, name: input.extracted.brand, activeCodes: uniqueBrands.find(b => b.slug === input.extracted?.slug)?.activeCodes || 0 }],
+        }]
       : []),
-    ...(brandResults.length > 0
-      ? [{ type: 'brand' as const, label: '🏢 Brands', items: brandResults }]
+    ...(uniqueBrands.length > 0
+      ? [{ type: 'brand' as const, label: '🏢 Brands', items: uniqueBrands }]
       : []),
-    ...(categorySlugs.length > 0
-      ? [
-          {
-            type: 'category' as const,
-            label: '📦 Categories',
-            items: categorySlugs.map((s) => ({
-              slug: s,
-              name: s.charAt(0).toUpperCase() + s.slice(1),
-              category: BRAND_CATEGORIES[s],
-            })),
-          },
-        ]
+    ...(matchedCategories.length > 0
+      ? [{
+          type: 'category' as const,
+          label: '📦 Categories',
+          items: matchedCategories.map(c => ({
+            slug: c.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+            name: c,
+            category: c,
+          })),
+        }]
       : []),
   ];
 
-  return NextResponse.json({ suggestions, brands: brandResults });
+  return NextResponse.json({ suggestions, brands: uniqueBrands });
 }

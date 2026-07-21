@@ -73,6 +73,7 @@ export default function AdminPage() {
         totalClicks: String(d.totalClicks ?? '0'),
         totalUpvotes: String(d.totalUpvotes ?? '0'),
         totalDownvotes: String(d.totalDownvotes ?? '0'),
+        uniquePageviews: String(d.uniquePageviews ?? '0'),
       });
     }
   };
@@ -238,6 +239,7 @@ export default function AdminPage() {
             <StatCard label="Clicks" value={stats.totalClicks || '0'} sub="On offers" color="#f59e0b" />
             <StatCard label="Upvotes" value={stats.totalUpvotes || '0'} sub="Positive feedback" color="#22c55e" />
             <StatCard label="Downvotes" value={stats.totalDownvotes || '0'} sub="Negative feedback" color="#ef4444" />
+            <StatCard label="Pageviews" value={stats.uniquePageviews || '0'} sub="Unique today" color="#3b82f6" />
             <StatCard label="Users" value={stats.totalUsers || '0'} sub="Admin accounts" color="#6b7280" />
           </div>
 

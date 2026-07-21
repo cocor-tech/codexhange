@@ -14,8 +14,9 @@ export async function GET() {
 
   const [
     pendingReview, totalBrands, totalOffers, totalUsers,
-    totalWebsites, totalCategories, totalCodes, publishedOffers,
+    totalWebsites,     totalCategories, totalCodes, publishedOffers,
     blockedSites, totalClicks, totalUpvotes, totalDownvotes,
+    uniquePageviews,
   ] = await Promise.all([
     Offer.countDocuments({ status: 'pending_review' }),
     Brand.countDocuments({}),
@@ -29,11 +30,13 @@ export async function GET() {
     Offer.aggregate([{ $group: { _id: null, total: { $sum: '$clicks' } } }]).then(r => r[0]?.total || 0),
     Offer.aggregate([{ $group: { _id: null, total: { $sum: '$upvotes' } } }]).then(r => r[0]?.total || 0),
     Offer.aggregate([{ $group: { _id: null, total: { $sum: '$downvotes' } } }]).then(r => r[0]?.total || 0),
+    connectDB().then(m => m.connection.collection('pageviews').countDocuments({})).catch(() => 0),
   ]);
 
   return NextResponse.json({
     pendingReview, totalBrands, totalOffers, totalUsers,
     totalWebsites, totalCategories, totalCodes, publishedOffers,
     blockedSites, totalClicks, totalUpvotes, totalDownvotes,
+    uniquePageviews,
   });
 }
