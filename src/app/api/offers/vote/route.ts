@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     offerId,
     { $inc: { [field]: 1 } },
     { new: true }
-  ).lean();
+  ).lean() as any;
 
   if (!offer) {
     return NextResponse.json({ error: 'Offer not found' }, { status: 404 });
@@ -58,8 +58,8 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    upvotes: offer.upvotes,
-    downvotes: offer.downvotes,
+    upvotes: offer.upvotes || 0,
+    downvotes: offer.downvotes || 0,
     changed: existing ? true : false,
   });
 }
