@@ -30,7 +30,6 @@ function getHeaders() {
 }
 
 const nextConfig = {
-  output: 'standalone',
   allowedDevOrigins: ['185.70.187.114'],
   images: {
     remotePatterns: [
