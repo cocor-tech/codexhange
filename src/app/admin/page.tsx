@@ -243,6 +243,25 @@ export default function AdminPage() {
             <StatCard label="Users" value={stats.totalUsers || '0'} sub="Admin accounts" color="#6b7280" />
           </div>
 
+          {/* Bot Controls */}
+          <div className="glass-card p-4 mb-6 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Bot Scanner</h3>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Scan promocodes.com for new deals</p>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={async () => {
+                const btn = document.activeElement as HTMLButtonElement;
+                if (btn) { btn.textContent = 'Running...'; btn.disabled = true; }
+                await window.fetch('/api/admin/scan-progress', {
+                  method: 'POST', headers: {'Content-Type': 'application/json'},
+                  body: JSON.stringify({ action: 'start' })
+                });
+                setTimeout(() => { window.location.reload(); }, 2000);
+              }} className="btn-primary px-4 py-2 text-xs">▶ Start Scan</button>
+            </div>
+          </div>
+
           {/* Scan progress */}
           {scanProgress && scanProgress.status !== 'idle' && scanProgress.total > 0 && (
             <div className="glass-card p-4 mb-6">
