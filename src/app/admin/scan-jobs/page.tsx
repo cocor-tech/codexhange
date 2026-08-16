@@ -6,6 +6,8 @@ export default function ScanJobsPage() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const [triggering, setTriggering] = useState(false);
+  const [triggerMsg, setTriggerMsg] = useState('');
 
   const load = async () => {
     setLoading(true);
@@ -17,6 +19,28 @@ export default function ScanJobsPage() {
   };
 
   useEffect(() => { load(); }, [filter]);
+
+  const triggerBot = async () => {
+    setTriggering(true);
+    setTriggerMsg('');
+    try {
+      const res = await window.fetch('/api/admin/scan-jobs/trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: '', websiteId: '' }),
+      });
+      const data = await res.json();
+      if (res.ok && data.triggered) {
+        setTriggerMsg('✅ Bot triggered — queued jobs are being processed now');
+      } else {
+        setTriggerMsg(`❌ ${data.error || 'Failed to trigger bot'}`);
+      }
+    } catch (err: any) {
+      setTriggerMsg(`❌ ${err.message}`);
+    }
+    setTriggering(false);
+    setTimeout(() => load(), 3000);
+  };
 
   const statusColor = (s: string) => {
     const m: Record<string, string> = {
@@ -32,6 +56,17 @@ export default function ScanJobsPage() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Scan Jobs</h1>
           <a href="/admin" className="text-xs hover:underline" style={{ color: 'var(--text-muted)' }}>← Dashboard</a>
+        </div>
+
+        <div className="flex items-center gap-3 mb-4">
+          <button
+            onClick={triggerBot}
+            disabled={triggering}
+            className="btn-primary px-4 py-2 text-sm whitespace-nowrap"
+          >
+            {triggering ? 'Triggering…' : '▶ Process Queued Jobs Now'}
+          </button>
+          {triggerMsg && <span className="text-xs" style={{ color: 'var(--text-primary)' }}>{triggerMsg}</span>}
         </div>
 
         <div className="flex gap-2 mb-4">

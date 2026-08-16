@@ -49,22 +49,24 @@ export default function ScannerPage() {
     setScanning(true);
     setLogs([]);
     setResult(null);
-    addLog(`Scanning: ${url}`);
-    addLog(`Fetching page with fallbacks...`);
+    addLog(`Queueing scan for: ${url}`);
+    addLog(`Triggering GitHub bot...`);
 
     try {
-      const res = await window.fetch('/api/admin/scan', {
+      const brand = selectedBrand ? brands.find(b => b._id === selectedBrand) : null;
+      const res = await window.fetch('/api/admin/scan-jobs/trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, websiteId: brand?._id || '', source_type: 'manual' }),
       });
       const data = await res.json();
-      setResult(data);
-      addLog(`Status: ${data.status} | Source: ${data.source}`);
-      if (data.blocked) addLog(`⚠ Blocked: ${data.blocked_reason}`);
-      if (data.codes?.length) addLog(`✅ Codes found: ${data.codes.join(', ')}`);
-      else if (data.success) addLog(`No promo codes found on this page`);
-      if (!data.success) addLog(`❌ ${data.error}`);
+      if (res.ok && data.triggered) {
+        setResult({ url, success: true, status: 202, source: 'github-actions', blocked: false, blocked_reason: '', title: 'Scan job queued', codes: [], countries: [], deal_type: '', discount: '', error: '', fetched_at: new Date().toISOString() });
+        addLog(`✅ Job queued & bot triggered — results appear in a few minutes`);
+      } else {
+        setResult({ url, success: false, status: res.status, source: 'github-actions', blocked: false, blocked_reason: '', title: '', codes: [], countries: [], deal_type: '', discount: '', error: data.error || 'Failed', fetched_at: new Date().toISOString() });
+        addLog(`❌ ${data.error || 'Failed to trigger bot'}`);
+      }
     } catch (err: any) {
       addLog(`❌ Error: ${err.message}`);
     }
