@@ -2,8 +2,16 @@ import os
 from typing import Optional
 from pymongo import MongoClient
 
+DEFAULT_DB_NAME = "codexhange"
 _client: Optional[MongoClient] = None
 _db = None
+
+def _uri_with_db(uri: str) -> str:
+    host_part = uri.split("?")[0].replace("mongodb+srv://", "", 1)
+    if "/" in host_part.split("@")[-1]:
+        return uri
+    sep = "&" if "?" in uri else "?"
+    return f"{uri}{sep}authSource={DEFAULT_DB_NAME}"
 
 def connect():
     global _client, _db
@@ -12,8 +20,9 @@ def connect():
     uri = os.environ.get("MONGODB_URI")
     if not uri:
         raise RuntimeError("MONGODB_URI is required")
+    uri = _uri_with_db(uri)
     _client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-    _db = _client.get_default_database()
+    _db = _client[DEFAULT_DB_NAME]
     return _db
 
 def close():
