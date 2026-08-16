@@ -2,7 +2,7 @@ bot/
 *.py
 *.pyc
 __pycache__/
-data/
+/data/
 .env
 .env.local
 .env*.local
