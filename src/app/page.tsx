@@ -3,6 +3,8 @@ import { Logo } from '@/components/Logo';
 import { SearchBar } from '@/components/landing/SearchBar';
 import { RegionSelector } from '@/components/landing/RegionSelector';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+
+export const dynamic = 'force-dynamic';
 import { connectDB } from '@/lib/mongoose';
 import Brand from '@/lib/models/Brand';
 import Offer from '@/lib/models/Offer';
