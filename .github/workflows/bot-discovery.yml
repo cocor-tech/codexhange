@@ -17,6 +17,17 @@ jobs:
   discover:
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    env:
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
+      AI_API_KEY: ${{ secrets.AI_API_KEY }}
+      AI_MODEL: ${{ secrets.AI_MODEL }}
+      CONCURRENCY: ${{ secrets.CONCURRENCY }}
+      BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
+      EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+      ADMIN_SEED_EMAIL: ${{ secrets.ADMIN_SEED_EMAIL }}
+      ADMIN_SEED_PASSWORD: ${{ secrets.ADMIN_SEED_PASSWORD }}
+      NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,8 +49,6 @@ jobs:
             echo "Processing next job..."
           done
         working-directory: bot
-        env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
 
       - name: Check if this is the 6am UTC run (full discovery)
         id: should_full
@@ -61,12 +70,8 @@ jobs:
             node standalone.js --brands
           fi
         working-directory: bot
-        env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}
 
       - name: Incremental discovery — stale brands only (all other runs)
         if: steps.should_full.outputs.full != 'true' && inputs.fullDiscovery != true
         run: node standalone.js --stale
         working-directory: bot
-        env:
-          MONGODB_URI: ${{ secrets.MONGODB_URI }}

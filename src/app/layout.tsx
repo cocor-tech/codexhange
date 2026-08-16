@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { Poppins } from 'next/font/google';
+import { GoogleAnalytics } from '@next/third-parties/google';
+import { Analytics } from '@vercel/analytics/react';
 import { ToastProvider } from '@/components/ui/Toast';
 import { Navbar } from '@/components/Navbar';
 import { PageviewTracker } from '@/components/PageviewTracker';
@@ -52,6 +54,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="flex-1">{children}</div>
           <FooterWrapper />
           </ToastProvider>
+          <Analytics />
+          {process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID && (
+            <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
+          )}
       </body>
     </html>
   );
