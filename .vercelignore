@@ -1,0 +1,17 @@
+bot/
+*.py
+*.pyc
+__pycache__/
+data/
+.env
+.env.local
+.env*.local
+*.log
+clean_and_writeups.py
+clean_offers.py
+seed_websites.py
+brands-export.txt
+criterias.md
+ADMIN_SETUP.md
+Procfile
+start.sh
