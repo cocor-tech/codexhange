@@ -6,3 +6,5 @@ node_modules/
 /data/
 out/
 dist/
+.vercel
+.env*

@@ -251,6 +251,20 @@ export default function AdminPage() {
               <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Scan promocodes.com for new deals</p>
             </div>
             <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  if (!window.confirm('Seed 543 brands + 543 websites? Run once on a fresh DB.')) return;
+                  const btn = document.activeElement as HTMLButtonElement;
+                  if (btn) { btn.textContent = 'Seeding...'; btn.disabled = true; }
+                  const res = await window.fetch('/api/admin/brands/seed', {
+                    method: 'POST', headers: adminHeaders(),
+                  });
+                  const d = await res.json().catch(() => ({}));
+                  if (btn) { btn.textContent = 'Seed Database'; btn.disabled = false; }
+                  msg(d.error ? `❌ ${d.error}` : `✅ Seeded: ${d.brandsCreated} brands, ${d.websitesCreated} websites`);
+                }}
+                className="btn-glass px-4 py-2 text-xs"
+              >Seed Database</button>
               <button onClick={async () => {
                 const btn = document.activeElement as HTMLButtonElement;
                 if (btn) { btn.textContent = 'Running...'; btn.disabled = true; }
