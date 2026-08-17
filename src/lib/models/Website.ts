@@ -3,6 +3,8 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IWebsite extends Document {
   url: string;
   domain: string;
+  kind: 'brand' | 'source' | 'manual';
+  source?: string;
   brand: {
     name: string;
     slug: string;
@@ -41,6 +43,8 @@ const WebsiteSchema = new Schema<IWebsite>(
   {
     url: { type: String, required: true, unique: true },
     domain: { type: String, required: true },
+    kind: { type: String, enum: ['brand', 'source', 'manual'], default: 'manual' },
+    source: { type: String },
     brand: {
       name: { type: String, required: true },
       slug: { type: String, required: true },

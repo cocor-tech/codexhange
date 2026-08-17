@@ -1,7 +1,9 @@
-import asyncio, os, argparse, logging
+import asyncio, os, argparse, logging, re
 from datetime import datetime, timezone, timedelta
+from urllib.parse import urljoin, urlparse
 from dotenv import load_dotenv
 from colorama import Fore, Style, init
+from bs4 import BeautifulSoup
 
 load_dotenv()
 init(autoreset=True)
@@ -11,14 +13,22 @@ from db import connect, close
 from client import create_shared_client
 from app.config import settings
 from app.models.deal import Deal
-from app.adapters.promocodes import PromoCodesAdapter
-from app.adapters.couponbind import CouponBindAdapter
-from app.adapters.groupon import GrouponAdapter
-from app.publishers.mongo import build_document, insert_blocked
-from app.workers.enricher import load_provider, enrich_batch
+from app.adapters import HomepageAdapter, CrawlerAdapter, LinkDiscoveryAdapter
+from app.publishers.mongo import build_document
+from app.workers.enricher import load_provider, enrich_batch, NullProvider
+from app.workers.scanner import scan_source
 
-ADAPTERS = [PromoCodesAdapter(), CouponBindAdapter(), GrouponAdapter()]
+ADAPTERS = [HomepageAdapter(), CrawlerAdapter(), LinkDiscoveryAdapter()]
 SEMAPHORE = asyncio.Semaphore(settings.CONCURRENCY)
+
+BRAND_PATH_PATTERNS = [
+    re.compile(r'/(?:store|stores|brand|brands|coupon|coupons|promo|promos|promo-code|deal|deals|offer|offers|discount|discounts|voucher|vouchers)/([a-z0-9][a-z0-9\-]{1,63})/?$', re.I),
+    re.compile(r'/c/([a-z0-9][a-z0-9\-]{1,63})/?$', re.I),
+]
+SKIP_SLUGS = {'home', 'all', 'shop', 'login', 'signin', 'signup', 'register', 'cart',
+              'checkout', 'contact', 'about', 'help', 'faq', 'privacy', 'terms',
+              'sitemap', 'feed', 'feed.xml', 'robots.txt', 'search', 'category',
+              'categories', 'stores', 'store', 'brands', 'brand', 'coupons', 'deals'}
 
 def write_log(db, name, status, found=0, submitted=0, error=""):
     try:
@@ -27,13 +37,74 @@ def write_log(db, name, status, found=0, submitted=0, error=""):
             "error": error or None, "scanned_at": datetime.now(timezone.utc)})
     except: pass
 
+def slugify(name: str) -> str:
+    s = re.sub(r'[^a-z0-9\- ]', '', name.lower().strip())
+    return re.sub(r'\s+', '-', s)[:80]
+
+def normalize_brand_name(slug: str) -> str:
+    name = slug.replace('-', ' ').replace('_', ' ')
+    parts = [p for p in name.split() if p]
+    return ' '.join(p.capitalize() for p in parts) if parts else slug
+
+def find_slug_in_url(path: str):
+    for pat in BRAND_PATH_PATTERNS:
+        m = pat.search(path)
+        if m:
+            slug = m.group(1).lower()
+            if slug not in SKIP_SLUGS:
+                return slug
+    return None
+
 async def check_alive(url: str) -> bool:
     import httpx
     try:
         async with httpx.AsyncClient(timeout=4.0, follow_redirects=True) as c:
             async with c.stream("GET", url, headers={"User-Agent": "Mozilla/5.0"}) as r:
-                return True  # Any response means the server is alive
+                return True
     except: return False
+
+async def fetch_text(client, url, timeout=8.0):
+    try:
+        r = await client.get(url, timeout=timeout, follow_redirects=True)
+        if r.status_code != 200:
+            return None
+        return r.text
+    except Exception:
+        return None
+
+async def fetch_sitemap_urls(client, base: str) -> list:
+    candidates = ["/sitemap.xml", "/sitemap_index.xml", "/sitemap-index.xml",
+                  "/sitemap1.xml", "/sitemap/sitemap.xml"]
+    for path in candidates:
+        text = await fetch_text(client, base.rstrip('/') + path)
+        if not text:
+            continue
+        try:
+            soup = BeautifulSoup(text, 'lxml')
+            locs = [loc.get_text(strip=True) for loc in soup.find_all('loc')]
+        except Exception:
+            continue
+        if not locs:
+            continue
+        if any('sitemap' in (u.lower()) and (u.lower().endswith('.xml')) for u in locs):
+            nested = []
+            for u in locs[:50]:
+                sub = await fetch_text(client, u, timeout=6.0)
+                if sub:
+                    try:
+                        sub_soup = BeautifulSoup(sub, 'lxml')
+                        nested += [loc.get_text(strip=True) for loc in sub_soup.find_all('loc')]
+                    except Exception:
+                        continue
+            locs = nested
+        return [u for u in locs if u.startswith('http')]
+    return []
+
+def same_host(url: str, base: str) -> bool:
+    try:
+        return urlparse(url).netloc == urlparse(base).netloc
+    except Exception:
+        return False
 
 async def process_website(db, site, client):
     wid = site["_id"]
@@ -143,6 +214,142 @@ async def discover_all(max_brands=None, stale_hours=None, names=None):
     print(f"\n{Fore.CYAN}Done.{Style.RESET_ALL}")
     close()
 
+async def discover_from_sources(max_per_source=80):
+    """Crawl the sources collection (coupon aggregators) and discover brands + codes."""
+    db = connect()
+    sources = list(db["sources"].find({"status": "active"}))
+    print(f"{Fore.CYAN}=== Source discovery: {len(sources)} sources ==={Style.RESET_ALL}\n")
+    now = datetime.now(timezone.utc)
+    total_brands, total_offers = 0, 0
+
+    async with create_shared_client() as client:
+        for src in sources:
+            sid = src["_id"]
+            base = src.get("url", "").rstrip('/')
+            sname = src.get("name", base)
+            if not base:
+                continue
+
+            # 1) homepage links
+            brand_pages = {}
+            html = await fetch_text(client, base, timeout=8.0)
+            if html:
+                soup = BeautifulSoup(html, 'lxml')
+                for a in soup.find_all('a', href=True):
+                    try:
+                        full = urljoin(base, a['href'])
+                    except Exception:
+                        continue
+                    if not same_host(full, base):
+                        continue
+                    slug = find_slug_in_url(urlparse(full).path)
+                    if not slug:
+                        continue
+                    if slug not in brand_pages:
+                        brand_pages[slug] = full
+
+            # 2) sitemap
+            sitemap_urls = await fetch_sitemap_urls(client, base)
+            for u in sitemap_urls:
+                if not same_host(u, base):
+                    continue
+                slug = find_slug_in_url(urlparse(u).path)
+                if slug and slug not in brand_pages:
+                    brand_pages[slug] = u
+
+            if not brand_pages:
+                db["sources"].update_one({"_id": sid}, {"$set": {
+                    "stats.last_scan": now, "stats.last_error": "no brand pages found"}})
+                print(f"  {Fore.YELLOW}[-] {sname:<24} 0 brand pages{Style.RESET_ALL}")
+                continue
+
+            slugs = list(brand_pages.keys())[:max_per_source]
+            discovered = 0
+            offers = 0
+
+            for slug in slugs:
+                page_url = brand_pages[slug]
+                bname = normalize_brand_name(slug)
+
+                # upsert brand
+                existing = db["brands"].find_one({"slug": slug})
+                if existing:
+                    brand_id = existing["_id"]
+                else:
+                    brand_doc = {
+                        "name": bname, "slug": slug, "website": page_url,
+                        "categories": [], "hasPromoCodes": True,
+                        "hasReferralProgram": False, "country": "US",
+                        "active": True, "source": sname, "sourceUrl": page_url,
+                        "createdAt": now, "updatedAt": now,
+                    }
+                    brand_id = db["brands"].insert_one(brand_doc).inserted_id
+                db["brands"].update_one({"_id": brand_id},
+                    {"$set": {"website": page_url, "source": sname, "sourceUrl": page_url, "updatedAt": now}})
+
+                # upsert website pointing at the source's brand page
+                ws = db["websites"].find_one({"url": page_url})
+                if not ws:
+                    ws_id = db["websites"].insert_one({
+                        "url": page_url,
+                        "domain": urlparse(page_url).netloc,
+                        "brand": {"name": bname, "slug": slug},
+                        "status": "active",
+                        "kind": "brand",
+                        "source": sname,
+                        "settings": {"scan_frequency": 6, "crawl_depth": 1,
+                                     "javascript": False, "auto_publish": True, "ai_enabled": True},
+                        "stats": {"offers_found": 0, "offers_published": 0, "blocked_count": 0,
+                                  "success_rate": 0, "health_score": 0},
+                        "createdAt": now, "updatedAt": now,
+                    }).inserted_id
+                else:
+                    ws_id = ws["_id"]
+                    db["websites"].update_one({"_id": ws_id},
+                        {"$set": {"kind": "brand", "source": sname, "updatedAt": now}})
+
+                # scan the source brand page for codes
+                result = await scan_source(client, page_url, bname)
+                if result.get("blocked"):
+                    db["websites"].update_one({"_id": ws_id}, {"$inc": {"stats.blocked_count": 1}})
+                    continue
+                if result.get("success") and result.get("codes"):
+                    code = result["codes"][0] if result["codes"] else None
+                    deal = Deal(
+                        store_name=bname,
+                        deal_type=result.get("deal_type", "sale"),
+                        code=code,
+                        title=str(result.get("title") or f"{bname} offer")[:200],
+                        destination_url=page_url,
+                        source_page=page_url,
+                        confidence_score=85 if code else 60,
+                        strategy="source_discovery",
+                        countries=result.get("countries", []),
+                        discount_value=result.get("discount", ""),
+                    )
+                    doc = build_document(deal, ws_id, {"brand": {"name": bname, "slug": slug}, "url": page_url})
+                    doc["store_name"] = bname
+                    doc["websiteId"] = ws_id
+                    db.offers.delete_many({"websiteId": ws_id, "sourceUrl": page_url, "status": {"$ne": "published"}})
+                    db.offers.insert_one(doc)
+                    offers += 1
+                    discovered += 1
+
+                db["websites"].update_one({"_id": ws_id},
+                    {"$set": {"stats.last_scan": now, "stats.offers_found": offers}})
+
+            db["sources"].update_one({"_id": sid}, {"$set": {
+                "stats.brands_found": discovered,
+                "stats.offers_found": offers,
+                "stats.last_scan": now,
+                "stats.last_error": None}})
+            total_brands += discovered
+            total_offers += offers
+            print(f"  {Fore.GREEN}[+] {sname:<24} brands={discovered} offers={offers}{Style.RESET_ALL}")
+
+    print(f"\n{Fore.CYAN}=== Done: {total_brands} brands, {total_offers} offers ==={Style.RESET_ALL}")
+    close()
+
 def purge_expired():
     db = connect()
     now = datetime.now(timezone.utc)
@@ -166,7 +373,6 @@ async def process_jobs():
 
         print(f"{Fore.CYAN}Processing job: {job['url']}{Style.RESET_ALL}")
 
-        # Get the website for this job
         site = db["websites"].find_one({"_id": job["websiteId"]})
         if not site:
             scanjobs.update_one({"_id": job["_id"]}, {"$set": {"status": "failed", "error": "Website not found", "finished_at": datetime.now(timezone.utc)}})
@@ -175,7 +381,6 @@ async def process_jobs():
         brand_name = site.get("brand", {}).get("name", site.get("domain", "Unknown"))
         url = job["url"]
 
-        # Check alive
         alive = await check_alive(url.rstrip("/"))
         if not alive:
             scanjobs.update_one({"_id": job["_id"]}, {"$set": {"status": "blocked", "error": "site unreachable", "finished_at": datetime.now(timezone.utc)}})
@@ -183,10 +388,8 @@ async def process_jobs():
             print(f"  {Fore.RED}[-] {brand_name:<20} site unreachable{Style.RESET_ALL}")
             continue
 
-        # Process the single URL
         async with create_shared_client() as client:
             try:
-                from app.workers.scanner import scan_source
                 result = await asyncio.wait_for(scan_source(client, url, brand_name), timeout=30.0)
 
                 if result.get("blocked"):
@@ -210,7 +413,6 @@ async def process_jobs():
                     doc = build_document(deal, site["_id"], site)
                     doc["store_name"] = brand_name
                     doc["websiteId"] = site["_id"]
-                    # Wipe old non-published offers for this URL
                     db.offers.delete_many({"websiteId": site["_id"], "sourceUrl": url, "status": {"$ne": "published"}})
                     db.offers.insert_one(doc)
                     scanjobs.update_one({"_id": job["_id"]}, {"$set": {"status": "completed", "offers_found": len(result["codes"]), "finished_at": datetime.now(timezone.utc)}})
@@ -225,9 +427,11 @@ async def process_jobs():
                 print(f"  {Fore.RED}[-] {brand_name:<20} timeout{Style.RESET_ALL}")
 
 def main():
-    VERSION = "2.0.0"
+    VERSION = "2.1.0"
     p = argparse.ArgumentParser(description="Codexhange Offer Intelligence Platform")
     p.add_argument("--scan", action="store_true", help="Scan all active websites")
+    p.add_argument("--sources", action="store_true", help="Discover brands + offers from crawl sources")
+    p.add_argument("--max-per-source", type=int, default=80, help="Max brand pages per source")
     p.add_argument("--process-jobs", action="store_true", help="Process queued scan jobs")
     p.add_argument("--max", type=int, help="Max websites to scan")
     p.add_argument("--names", type=str, help="Filter by brand names (comma-separated)")
@@ -238,6 +442,8 @@ def main():
     if args.version: print(f"Codexhange Bot v{VERSION}"); return
     if args.purge_expired: purge_expired(); return
     if args.process_jobs: asyncio.run(process_jobs()); return
+    if args.sources:
+        asyncio.run(discover_from_sources(max_per_source=args.max_per_source)); return
     if args.stale: asyncio.run(discover_all(stale_hours=24)); return
     if args.scan:
         names = [n.strip() for n in args.names.split(",")] if args.names else None

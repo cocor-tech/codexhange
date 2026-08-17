@@ -48,6 +48,16 @@ jobs:
         run: python main.py --process-jobs
         working-directory: bot
 
+      - name: Source discovery — crawl aggregator sources for new brands + codes
+        run: |
+          MAX="${{ inputs.maxBrands }}"
+          if [ -n "$MAX" ]; then
+            python main.py --sources --max-per-source "$MAX"
+          else
+            python main.py --sources
+          fi
+        working-directory: bot
+
       - name: Check if this is the 6am UTC run (full discovery)
         id: should_full
         run: |

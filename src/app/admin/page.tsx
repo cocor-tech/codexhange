@@ -76,6 +76,11 @@ export default function AdminPage() {
         totalUpvotes: String(d.totalUpvotes ?? '0'),
         totalDownvotes: String(d.totalDownvotes ?? '0'),
         uniquePageviews: String(d.uniquePageviews ?? '0'),
+        totalSources: String(d.totalSources ?? '0'),
+        activeSources: String(d.activeSources ?? '0'),
+        sourceBrands: String(d.sourceBrands ?? '0'),
+        sourceOffers: String(d.sourceOffers ?? '0'),
+        lastSourceScan: d.lastSourceScan ? new Date(d.lastSourceScan).toLocaleString() : 'never',
       });
     }
   };
@@ -230,11 +235,15 @@ export default function AdminPage() {
 
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
-            <StatCard label="Websites" value={stats.totalWebsites || '0'} sub="Active sources" color="#3b82f6" />
+            <StatCard label="Crawl Sources" value={stats.totalSources || '0'} sub={`${stats.activeSources || '0'} active`} color="#3b82f6" />
+            <StatCard label="Brands from Sources" value={stats.sourceBrands || '0'} sub="Discovered" color="#a855f7" />
+            <StatCard label="Offers from Sources" value={stats.sourceOffers || '0'} sub="Found via crawl" color="#22c55e" />
+            <StatCard label="Last Source Scan" value={stats.lastSourceScan || 'never'} sub="Aggregator crawl" color="#f59e0b" />
             <StatCard label="Offers" value={stats.totalOffers || '0'} sub="Total discovered" color="#22c55e" />
             <StatCard label="Published" value={stats.publishedOffers || '0'} sub="Live on site" color="#22c55e" />
             <StatCard label="Pending Review" value={stats.pendingReview || '0'} sub="Needs approval" color="#f59e0b" />
             <StatCard label="Brands" value={stats.totalBrands || '0'} sub="In database" color="#a855f7" />
+            <StatCard label="Websites" value={stats.totalWebsites || '0'} sub="Crawl targets" color="#3b82f6" />
             <StatCard label="Categories" value={stats.totalCategories || '0'} sub="Organized" color="#ec4899" />
             <StatCard label="User Codes" value={stats.totalCodes || '0'} sub="Submitted" color="#3b82f6" />
             <StatCard label="Blocked Sites" value={stats.blockedSites || '0'} sub="Cloudflare etc" color="#ef4444" />
@@ -249,23 +258,23 @@ export default function AdminPage() {
           <div className="glass-card p-4 mb-6 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Bot Scanner</h3>
-              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Scan promocodes.com for new deals</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Crawl active sources for new brands + codes</p>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={async () => {
-                  if (!window.confirm('Seed 543 brands + 543 websites? Run once on a fresh DB.')) return;
+                  if (!window.confirm('Verify DB state? Brands are discovered automatically by the bot from crawl sources.')) return;
                   const btn = document.activeElement as HTMLButtonElement;
-                  if (btn) { btn.textContent = 'Seeding...'; btn.disabled = true; }
+                  if (btn) { btn.textContent = 'Checking...'; btn.disabled = true; }
                   const res = await window.fetch('/api/admin/brands/seed', {
                     method: 'POST', headers: adminHeaders(),
                   });
                   const d = await res.json().catch(() => ({}));
-                  if (btn) { btn.textContent = 'Seed Database'; btn.disabled = false; }
-                  msg(d.error ? `❌ ${d.error}` : `✅ Seeded: ${d.brandsCreated} brands, ${d.websitesCreated} websites`);
+                  if (btn) { btn.textContent = 'Check DB'; btn.disabled = false; }
+                  msg(d.error ? `❌ ${d.error}` : `✅ ${d.totalBrands} brands, ${d.totalWebsites} websites in DB`);
                 }}
                 className="btn-glass px-4 py-2 text-xs"
-              >Seed Database</button>
+              >Check DB</button>
               <button onClick={async () => {
                 const btn = document.activeElement as HTMLButtonElement;
                 if (btn) { btn.textContent = 'Running...'; btn.disabled = true; }

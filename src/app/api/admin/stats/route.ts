@@ -6,6 +6,7 @@ import Offer from '@/lib/models/Offer';
 import Website from '@/lib/models/Website';
 import User from '@/lib/models/User';
 import Code from '@/lib/models/Code';
+import Source from '@/lib/models/Source';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,8 @@ export async function GET() {
     pendingReview, totalBrands, totalOffers, totalUsers,
     totalWebsites,     totalCategories, totalCodes, publishedOffers,
     blockedSites, totalClicks, totalUpvotes, totalDownvotes,
-    uniquePageviews,
+    uniquePageviews, totalSources, activeSources,
+    sourceBrands, sourceOffers, lastSourceScan,
   ] = await Promise.all([
     Offer.countDocuments({ status: 'pending_review' }),
     Brand.countDocuments({}),
@@ -31,12 +33,18 @@ export async function GET() {
     Offer.aggregate([{ $group: { _id: null, total: { $sum: '$upvotes' } } }]).then(r => r[0]?.total || 0),
     Offer.aggregate([{ $group: { _id: null, total: { $sum: '$downvotes' } } }]).then(r => r[0]?.total || 0),
     connectDB().then(m => m.connection.collection('pageviews').countDocuments({})).catch(() => 0),
+    Source.countDocuments({}),
+    Source.countDocuments({ status: 'active' }),
+    Source.aggregate([{ $group: { _id: null, total: { $sum: '$stats.brands_found' } } }]).then(r => r[0]?.total || 0),
+    Source.aggregate([{ $group: { _id: null, total: { $sum: '$stats.offers_found' } } }]).then(r => r[0]?.total || 0),
+    Source.aggregate([{ $group: { _id: null, last: { $max: '$stats.last_scan' } } }]).then(r => r[0]?.last || null),
   ]);
 
   return NextResponse.json({
     pendingReview, totalBrands, totalOffers, totalUsers,
     totalWebsites, totalCategories, totalCodes, publishedOffers,
     blockedSites, totalClicks, totalUpvotes, totalDownvotes,
-    uniquePageviews,
+    uniquePageviews, totalSources, activeSources,
+    sourceBrands, sourceOffers, lastSourceScan,
   });
 }

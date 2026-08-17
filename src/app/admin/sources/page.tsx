@@ -98,13 +98,30 @@ export default function SourcesPage() {
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-base)' }}>
       <div className="mx-auto max-w-7xl px-6 py-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Crawl Sources</h1>
-            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>The coupon/deal aggregator sites the bot crawls. Stored only in your DB.</p>
+<div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Crawl Sources</h1>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>The coupon/deal aggregator sites the bot crawls. Stored only in your DB.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  setBusy(true);
+                  try {
+                    const res = await window.fetch('/api/admin/scan-jobs/trigger', {
+                      method: 'POST', headers: adminHeaders(),
+                      body: JSON.stringify({ fullDiscovery: false }),
+                    });
+                    const d = await res.json();
+                    msg(res.ok ? `✅ Bot run triggered: ${d.dispatchId || 'workflow started'}` : `❌ ${d.error || 'Failed'}`);
+                  } catch { msg('❌ Network error'); }
+                  setBusy(false);
+                }}
+                className="btn-primary px-4 py-2 text-xs whitespace-nowrap"
+              >{busy ? 'Triggering…' : '▶ Run Bot Now'}</button>
+              <a href="/admin" className="text-xs hover:underline" style={{ color: 'var(--text-muted)' }}>← Dashboard</a>
+            </div>
           </div>
-          <a href="/admin" className="text-xs hover:underline" style={{ color: 'var(--text-muted)' }}>← Dashboard</a>
-        </div>
 
         {batchMsg && <div className="glass-card p-3 mb-4 text-sm" style={{ color: 'var(--text-primary)' }}>{batchMsg}</div>}
 
@@ -116,7 +133,7 @@ export default function SourcesPage() {
             value={batchText}
             onChange={e => setBatchText(e.target.value)}
             rows={8}
-            placeholder={'https://www.promocodes.com|PromoCodes\nhttps://slickdeals.net|Slickdeals\n...'}
+            placeholder={'https://www.couponsite.com|Coupon Site\nhttps://dealsite.net|Deal Site\n...'}
             className="input-glass w-full px-3 py-2 text-sm font-mono"
             style={{ color: 'var(--text-primary)' }}
           />
@@ -152,6 +169,8 @@ export default function SourcesPage() {
           <div className="glass-card overflow-hidden">
             <div className="px-4 py-2 border-b text-xs font-semibold flex" style={{ color: 'var(--text-muted)', borderColor: 'var(--border)' }}>
               <span className="flex-1">Name</span>
+              <span className="w-16">Type</span>
+              <span className="w-12">Freq</span>
               <span className="w-16">Status</span>
               <span className="w-16">Brands</span>
               <span className="w-16">Offers</span>
@@ -165,6 +184,8 @@ export default function SourcesPage() {
                     <p className="truncate font-medium" style={{ color: 'var(--text-primary)' }}>{s.name}</p>
                     <p className="truncate text-[10px]" style={{ color: 'var(--text-muted)' }}>{s.url}</p>
                   </div>
+                  <span className="w-16 capitalize" style={{ color: 'var(--text-muted)' }}>{s.type || 'promo'}</span>
+                  <span className="w-12" style={{ color: 'var(--text-muted)' }}>{s.frequency_hours}h</span>
                   <button onClick={() => toggleStatus(s)} className="w-16 rounded-full text-center px-1.5 py-0.5 border" style={{ backgroundColor: `${statusColor(s.status)}20`, color: statusColor(s.status), borderColor: 'var(--border)' }}>
                     {s.status}
                   </button>
