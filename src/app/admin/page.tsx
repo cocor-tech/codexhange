@@ -15,7 +15,8 @@ type SessionState = {
 
 const NAV = [
   { href: '/admin', label: 'Dashboard', icon: '◉', desc: 'Overview & stats' },
-  { href: '/admin/websites', label: 'Websites', icon: '◐', desc: 'Manage sources' },
+  { href: '/admin/websites', label: 'Websites', icon: '◐', desc: 'Brand sites' },
+  { href: '/admin/sources', label: 'Crawl Sources', icon: '▤', desc: 'Coupon aggregator sites' },
   { href: '/admin/offers', label: 'Offers', icon: '◎', desc: 'All discovered deals' },
   { href: '/admin/review', label: 'Review Queue', icon: '◈', desc: 'Pending approval' },
   { href: '/admin/scanner', label: 'Deal Scanner', icon: '◉', desc: 'Scan any URL' },
