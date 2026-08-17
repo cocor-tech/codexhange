@@ -35,6 +35,7 @@ export async function POST() {
   let scanJobsCreated = 0;
 
   for (const entry of allBrands) {
+    try {
     const catId = await getOrCreateCategory(entry.category);
     const slug = entry.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
@@ -86,15 +87,22 @@ export async function POST() {
       } catch {
         domain = entry.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
       }
-      await Website.create({
-        url: entry.website,
-        domain,
-        brand: { name: entry.name, slug, category: entry.category },
-        status: 'active',
-        settings: { scan_frequency: 12, crawl_depth: 2, javascript: false, auto_publish: false, ai_enabled: false },
-        stats: { offers_found: 0, offers_published: 0, blocked_count: 0, success_rate: 0, health_score: 100 },
-      });
-      websitesCreated++;
+      try {
+        await Website.create({
+          url: entry.website,
+          domain,
+          brand: { name: entry.name, slug, category: entry.category },
+          status: 'active',
+          settings: { scan_frequency: 12, crawl_depth: 2, javascript: false, auto_publish: false, ai_enabled: false },
+          stats: { offers_found: 0, offers_published: 0, blocked_count: 0, success_rate: 0, health_score: 100 },
+        });
+        websitesCreated++;
+      } catch {
+        // Duplicate URL (brand shares site with another) — skip silently
+      }
+    }
+    } catch {
+      // Any error on this brand — skip and continue
     }
   }
 
