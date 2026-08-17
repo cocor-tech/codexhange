@@ -12,6 +12,10 @@ on:
       maxBrands:
         description: 'Max brands for full discovery (leave empty for all)'
         required: false
+      reset:
+        description: 'Purge websites/urls/offers before discovery (keeps sources)'
+        type: boolean
+        default: false
 
 jobs:
   discover:
@@ -42,6 +46,11 @@ jobs:
       - name: Install Playwright Chromium
         run: |
           python -m playwright install --with-deps chromium
+        working-directory: bot
+
+      - name: Reset bot data (websites/urls/offers), keep sources
+        if: inputs.reset == true
+        run: python main.py --reset
         working-directory: bot
 
       - name: Process admin queued jobs
