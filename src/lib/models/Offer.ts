@@ -22,6 +22,10 @@ export type VerifiedBy = 'bot' | 'admin';
 
 export interface IOffer extends Document {
   serviceId: mongoose.Types.ObjectId;
+  websiteId?: mongoose.Types.ObjectId;
+  urlId?: mongoose.Types.ObjectId;
+  store_name?: string;
+  store_slug?: string;
   type: OfferType | OfferType[];
   title: string;
   code?: string;
@@ -48,6 +52,10 @@ export interface IOffer extends Document {
 const OfferSchema = new Schema<IOffer>(
   {
     serviceId: { type: Schema.Types.ObjectId, ref: 'Service', required: true, index: true },
+    websiteId: { type: Schema.Types.ObjectId, ref: 'Website', index: true },
+    urlId: { type: Schema.Types.ObjectId, ref: 'Url', index: true },
+    store_name: { type: String, index: true },
+    store_slug: { type: String, index: true },
     type: { type: Schema.Types.Mixed, required: true },
     title: { type: String, required: true },
     code: { type: String },

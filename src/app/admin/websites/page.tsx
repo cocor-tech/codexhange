@@ -99,30 +99,44 @@ export default function WebsitesPage() {
         {loading ? <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Loading...</p> : (
           <div className="space-y-2">
             {websites.map((w: any) => (
-              <div key={w._id} className="glass-card flex items-center justify-between py-3 px-4">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{w.brand?.name || w.domain}</span>
-                    <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${
-                      w.status === 'active' ? 'bg-green-500/20 text-green-400' :
-                      w.status === 'paused' ? 'bg-yellow-500/20 text-yellow-400' :
-                      'bg-red-500/20 text-red-400'
-                    }`}>{w.status}</span>
-                    <span className="text-[10px] rounded-full px-1.5 py-0.5" style={{ backgroundColor: `${healthColor(w.stats?.health_score || 100)}20`, color: healthColor(w.stats?.health_score || 100) }}>
-                      {w.stats?.health_score || 100}%
-                    </span>
+              <div key={w._id} className="glass-card py-3 px-4">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{w.name || w.domain}</span>
+                      <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${
+                        w.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                        w.status === 'paused' ? 'bg-yellow-500/20 text-yellow-400' :
+                        'bg-red-500/20 text-red-400'
+                      }`}>{w.status}</span>
+                      <span className="text-[10px] rounded-full px-1.5 py-0.5" style={{ backgroundColor: `${healthColor(w.stats?.health_score || 100)}20`, color: healthColor(w.stats?.health_score || 100) }}>
+                        {w.stats?.health_score || 100}%
+                      </span>
+                    </div>
+                    <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      {w.domain} · {w.urls?.length || 0} URLs · {w.stats?.offers_found || 0} offers
+                    </p>
+                    {w.urls && w.urls.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        {w.urls.map((u: any) => (
+                          <div key={u._id} className="flex items-center gap-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                            <span className={`rounded px-1 py-px ${u.kind === 'homepage' ? 'bg-blue-500/15 text-blue-400' : u.kind === 'source_page' ? 'bg-purple-500/15 text-purple-400' : 'bg-gray-500/15'}`}>
+                              {u.kind}
+                            </span>
+                            <span className="truncate">{u.url}</span>
+                            <span className="shrink-0">{(u.stats?.offers_found || 0)} offers</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>{w.url}</p>
-                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                    {w.stats?.offers_found || 0} offers · {w.stats?.success_rate || 0}% success · {w.brand?.category || 'Uncategorized'}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5 ml-3">
-                  <a href={`/admin/websites/${w._id}`} className="rounded-md px-2 py-1 text-[10px] font-medium border hover:bg-blue-500/10"
-                    style={{ borderColor: 'var(--border)', color: '#3b82f6' }}>View</a>
-                  <button onClick={() => deleteWebsite(w._id, w.brand?.name || w.domain)}
-                    className="rounded-md px-2 py-1 text-[10px] font-medium border hover:bg-red-500/10"
-                    style={{ borderColor: 'var(--border)', color: '#ef4444' }}>Delete</button>
+                  <div className="flex shrink-0 items-center gap-1.5 ml-3">
+                    <a href={`/admin/websites/${w._id}`} className="rounded-md px-2 py-1 text-[10px] font-medium border hover:bg-blue-500/10"
+                      style={{ borderColor: 'var(--border)', color: '#3b82f6' }}>View</a>
+                    <button onClick={() => deleteWebsite(w._id, w.name || w.domain)}
+                      className="rounded-md px-2 py-1 text-[10px] font-medium border hover:bg-red-500/10"
+                      style={{ borderColor: 'var(--border)', color: '#ef4444' }}>Delete</button>
+                  </div>
                 </div>
               </div>
             ))}

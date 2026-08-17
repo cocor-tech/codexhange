@@ -41,6 +41,14 @@ def slugify(name: str) -> str:
     s = re.sub(r'[^a-z0-9\- ]', '', name.lower().strip())
     return re.sub(r'\s+', '-', s)[:80]
 
+def homepage_url(db, website_id) -> str | None:
+    """Return the canonical homepage URL for a website (kind=homepage), else any url."""
+    u = db["urls"].find_one({"websiteId": website_id, "kind": "homepage"})
+    if u:
+        return u["url"]
+    u = db["urls"].find_one({"websiteId": website_id})
+    return u["url"] if u else None
+
 def normalize_brand_name(slug: str) -> str:
     name = slug.replace('-', ' ').replace('_', ' ')
     parts = [p for p in name.split() if p]
@@ -108,8 +116,8 @@ def same_host(url: str, base: str) -> bool:
 
 async def process_website(db, site, client):
     wid = site["_id"]
-    brand_name = site.get("brand", {}).get("name", site.get("domain", "Unknown"))
-    url = site["url"]
+    brand_name = site.get("name", site.get("domain", "Unknown"))
+    url = await homepage_url(db, wid) or f"https://{site.get('domain', '')}"
 
     alive = await check_alive(url.rstrip("/"))
     if not alive:
@@ -197,8 +205,8 @@ async def discover_all(max_brands=None, stale_hours=None, names=None):
         cutoff = datetime.now(timezone.utc) - timedelta(hours=stale_hours)
         query["$or"] = [{"stats.last_scan": {"$lt": cutoff}}, {"stats.last_scan": None}]
     if names:
-        query["brand.name"] = {"$in": names}
-    sites = list(db["websites"].find(query).sort([("stats.last_scan", 1), ("brand.name", 1)]).limit(max_brands or 500))
+        query["name"] = {"$in": names}
+    sites = list(db["websites"].find(query).sort([("stats.last_scan", 1), ("name", 1)]).limit(max_brands or 500))
     print(f"{Fore.CYAN}=== Scanning {len(sites)} websites ==={Style.RESET_ALL}\n")
     async with create_shared_client() as client:
         async def worker(site):
@@ -206,21 +214,37 @@ async def discover_all(max_brands=None, stale_hours=None, names=None):
                 try:
                     await asyncio.wait_for(process_website(db, site, client), timeout=120.0)
                 except asyncio.TimeoutError:
-                    write_log(db, site.get("brand",{}).get("name",site.get("domain","?")), "timeout")
-                    print(f"  {Fore.RED}[-] {site.get('brand',{}).get('name','?'):<20} timeout{Style.RESET_ALL}")
+                    write_log(db, site.get("name", site.get("domain", "?")), "timeout")
+                    print(f"  {Fore.RED}[-] {site.get('name','?'):<20} timeout{Style.RESET_ALL}")
                 except Exception as e:
-                    print(f"  {Fore.RED}[-] {site.get('brand',{}).get('name','?'):<20} error: {e}{Style.RESET_ALL}")
+                    print(f"  {Fore.RED}[-] {site.get('name','?'):<20} error: {e}{Style.RESET_ALL}")
         await asyncio.gather(*[worker(s) for s in sites])
     print(f"\n{Fore.CYAN}Done.{Style.RESET_ALL}")
     close()
 
 async def discover_from_sources(max_per_source=80):
-    """Crawl the sources collection (coupon aggregators) and discover brands + codes."""
+    """Crawl the sources collection (coupon aggregators) and discover brands + codes.
+
+    New model:
+      - websites  = company entity (one per brand slug, canonical domain)
+      - urls      = pages belonging to a website (homepage, source page, coupon page)
+      - offers    = reference websiteId + urlId, destination_url = resolved merchant URL
+    Redirect links ("Shop Now" buttons) are resolved to the real merchant URL.
+    """
+    from app.services.resolver import resolve_final_url, extract_outbound_links, looks_like_redirect, is_redirect_domain
+    from urllib.parse import urlparse as _up
+
     db = connect()
     sources = list(db["sources"].find({"status": "active"}))
     print(f"{Fore.CYAN}=== Source discovery: {len(sources)} sources ==={Style.RESET_ALL}\n")
     now = datetime.now(timezone.utc)
     total_brands, total_offers = 0, 0
+
+    def canonical_domain(url: str) -> str:
+        try:
+            return _up(url).netloc.lower().replace("www.", "")
+        except Exception:
+            return ""
 
     async with create_shared_client() as client:
         for src in sources:
@@ -270,48 +294,68 @@ async def discover_from_sources(max_per_source=80):
             for slug in slugs:
                 page_url = brand_pages[slug]
                 bname = normalize_brand_name(slug)
+                source_domain = canonical_domain(base)
 
-                # upsert brand
-                existing = db["brands"].find_one({"slug": slug})
-                if existing:
-                    brand_id = existing["_id"]
-                else:
-                    brand_doc = {
-                        "name": bname, "slug": slug, "website": page_url,
-                        "categories": [], "hasPromoCodes": True,
-                        "hasReferralProgram": False, "country": "US",
-                        "active": True, "source": sname, "sourceUrl": page_url,
-                        "createdAt": now, "updatedAt": now,
-                    }
-                    brand_id = db["brands"].insert_one(brand_doc).inserted_id
-                db["brands"].update_one({"_id": brand_id},
-                    {"$set": {"website": page_url, "source": sname, "sourceUrl": page_url, "updatedAt": now}})
+                # -- resolve the brand page itself if it's a redirect --
+                merchant_url = page_url
+                if looks_like_redirect(page_url):
+                    res = await resolve_final_url(client, page_url)
+                    if res.get("ok") and not is_redirect_domain(res.get("domain", "")):
+                        merchant_url = res["final_url"]
 
-                # upsert website pointing at the source's brand page
-                ws = db["websites"].find_one({"url": page_url})
+                # -- upsert Website (company entity) --
+                ws = db["websites"].find_one({"slug": slug})
                 if not ws:
                     ws_id = db["websites"].insert_one({
-                        "url": page_url,
-                        "domain": urlparse(page_url).netloc,
-                        "brand": {"name": bname, "slug": slug},
+                        "name": bname, "slug": slug,
+                        "domain": canonical_domain(merchant_url),
                         "status": "active",
-                        "kind": "brand",
-                        "source": sname,
                         "settings": {"scan_frequency": 6, "crawl_depth": 1,
-                                     "javascript": False, "auto_publish": True, "ai_enabled": True},
+                                     "javascript": False, "auto_publish": True, "ai_enabled": False},
                         "stats": {"offers_found": 0, "offers_published": 0, "blocked_count": 0,
-                                  "success_rate": 0, "health_score": 0},
+                                  "success_rate": 0, "health_score": 100},
                         "createdAt": now, "updatedAt": now,
                     }).inserted_id
+                    discovered += 1
                 else:
                     ws_id = ws["_id"]
                     db["websites"].update_one({"_id": ws_id},
-                        {"$set": {"kind": "brand", "source": sname, "updatedAt": now}})
+                        {"$set": {"domain": canonical_domain(merchant_url), "updatedAt": now}})
 
-                # scan the source brand page for codes
+                # -- upsert Url (source brand page) grouped under the website --
+                url_doc = db["urls"].find_one({"url": page_url})
+                if not url_doc:
+                    url_id = db["urls"].insert_one({
+                        "websiteId": ws_id, "url": page_url,
+                        "domain": canonical_domain(page_url),
+                        "kind": "source_page", "source": sname, "status": "active",
+                        "stats": {"offers_found": 0, "blocked_count": 0, "health_score": 100},
+                        "createdAt": now, "updatedAt": now,
+                    }).inserted_id
+                else:
+                    url_id = url_doc["_id"]
+                    db["urls"].update_one({"_id": url_id},
+                        {"$set": {"websiteId": ws_id, "source": sname, "updatedAt": now}})
+
+                # -- also store the resolved merchant homepage URL (if it's a real site) --
+                resolved_id = None
+                if merchant_url != page_url and canonical_domain(merchant_url) != source_domain:
+                    mdoc = db["urls"].find_one({"url": merchant_url})
+                    if not mdoc:
+                        resolved_id = db["urls"].insert_one({
+                            "websiteId": ws_id, "url": merchant_url,
+                            "domain": canonical_domain(merchant_url),
+                            "kind": "homepage", "source": sname, "status": "active",
+                            "stats": {"offers_found": 0, "blocked_count": 0, "health_score": 100},
+                            "createdAt": now, "updatedAt": now,
+                        }).inserted_id
+                    else:
+                        resolved_id = mdoc["_id"]
+
+                # -- scan the source brand page for codes --
                 result = await scan_source(client, page_url, bname)
                 if result.get("blocked"):
-                    db["websites"].update_one({"_id": ws_id}, {"$inc": {"stats.blocked_count": 1}})
+                    db["urls"].update_one({"_id": url_id}, {"$inc": {"stats.blocked_count": 1}})
                     continue
                 if result.get("success") and result.get("codes"):
                     code = result["codes"][0] if result["codes"] else None
@@ -320,21 +364,25 @@ async def discover_from_sources(max_per_source=80):
                         deal_type=result.get("deal_type", "sale"),
                         code=code,
                         title=str(result.get("title") or f"{bname} offer")[:200],
-                        destination_url=page_url,
+                        destination_url=merchant_url,
                         source_page=page_url,
                         confidence_score=85 if code else 60,
                         strategy="source_discovery",
                         countries=result.get("countries", []),
                         discount_value=result.get("discount", ""),
                     )
-                    doc = build_document(deal, ws_id, {"brand": {"name": bname, "slug": slug}, "url": page_url})
+                    doc = build_document(deal, ws_id, {"name": bname, "slug": slug})
                     doc["store_name"] = bname
                     doc["websiteId"] = ws_id
+                    doc["urlId"] = url_id
+                    if resolved_id:
+                        doc["resolvedUrlId"] = resolved_id
                     db.offers.delete_many({"websiteId": ws_id, "sourceUrl": page_url, "status": {"$ne": "published"}})
                     db.offers.insert_one(doc)
                     offers += 1
-                    discovered += 1
 
+                db["urls"].update_one({"_id": url_id},
+                    {"$set": {"stats.last_scan": now, "stats.offers_found": offers}})
                 db["websites"].update_one({"_id": ws_id},
                     {"$set": {"stats.last_scan": now, "stats.offers_found": offers}})
 
@@ -378,7 +426,7 @@ async def process_jobs():
             scanjobs.update_one({"_id": job["_id"]}, {"$set": {"status": "failed", "error": "Website not found", "finished_at": datetime.now(timezone.utc)}})
             continue
 
-        brand_name = site.get("brand", {}).get("name", site.get("domain", "Unknown"))
+        brand_name = site.get("name", site.get("domain", "Unknown"))
         url = job["url"]
 
         alive = await check_alive(url.rstrip("/"))
@@ -426,8 +474,21 @@ async def process_jobs():
                 scanjobs.update_one({"_id": job["_id"]}, {"$set": {"status": "failed", "error": "timeout", "finished_at": datetime.now(timezone.utc)}})
                 print(f"  {Fore.RED}[-] {brand_name:<20} timeout{Style.RESET_ALL}")
 
+def reset_new_model():
+    """Purge bot-generated data while keeping sources (for model migration)."""
+    db = connect()
+    now = datetime.now(timezone.utc)
+    urls = db["urls"].delete_many({})
+    websites = db["websites"].delete_many({})
+    offers = db["offers"].delete_many({})
+    brands = db["brands"].delete_many({})
+    scanjobs = db["scanjobs"].delete_many({})
+    print(f"Purged urls={urls.deleted_count} websites={websites.deleted_count} "
+          f"offers={offers.deleted_count} brands={brands.deleted_count} scanjobs={scanjobs.deleted_count}")
+    close()
+
 def main():
-    VERSION = "2.1.0"
+    VERSION = "2.2.0"
     p = argparse.ArgumentParser(description="Codexhange Offer Intelligence Platform")
     p.add_argument("--scan", action="store_true", help="Scan all active websites")
     p.add_argument("--sources", action="store_true", help="Discover brands + offers from crawl sources")
@@ -437,9 +498,11 @@ def main():
     p.add_argument("--names", type=str, help="Filter by brand names (comma-separated)")
     p.add_argument("--stale", action="store_true", help="Scan websites not checked in 24h")
     p.add_argument("--purge-expired", action="store_true", help="Mark expired offers")
+    p.add_argument("--reset", action="store_true", help="Purge bot data (websites/urls/offers), keep sources")
     p.add_argument("--version", action="store_true", help="Show version")
     args = p.parse_args()
     if args.version: print(f"Codexhange Bot v{VERSION}"); return
+    if args.reset: reset_new_model(); return
     if args.purge_expired: purge_expired(); return
     if args.process_jobs: asyncio.run(process_jobs()); return
     if args.sources:

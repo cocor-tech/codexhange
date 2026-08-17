@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongoose';
 import Offer from '@/lib/models/Offer';
-import Brand from '@/lib/models/Brand';
+import Website from '@/lib/models/Website';
 import { BRAND_CATEGORIES, CATEGORIES } from '@/lib/brands';
 import { classifyInput } from '@/lib/search';
 
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
       { $sort: { count: -1 } },
       { $limit: 5 },
     ]),
-    Brand.find({ active: true, name: { $regex: escaped, $options: 'i' } })
+    Website.find({ status: 'active', name: { $regex: escaped, $options: 'i' } })
       .select('name slug')
       .limit(5)
       .lean(),

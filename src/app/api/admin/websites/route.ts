@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/requireAdmin';
 import { connectDB } from '@/lib/mongoose';
 import Website from '@/lib/models/Website';
+import Url from '@/lib/models/Url';
 import ScanJob from '@/lib/models/ScanJob';
 
 const INITIAL_PATTERNS = [
@@ -24,8 +25,9 @@ export async function GET(req: NextRequest) {
   if (status) filter.status = status;
   if (search) {
     filter.$or = [
-      { url: { $regex: search, $options: 'i' } },
-      { 'brand.name': { $regex: search, $options: 'i' } },
+      { name: { $regex: search, $options: 'i' } },
+      { slug: { $regex: search, $options: 'i' } },
+      { domain: { $regex: search, $options: 'i' } },
     ];
   }
 
@@ -34,7 +36,12 @@ export async function GET(req: NextRequest) {
     Website.countDocuments(filter),
   ]);
 
-  return NextResponse.json({ websites, total, page, pages: Math.ceil(total / limit) });
+  const withUrls = await Promise.all(websites.map(async (w) => {
+    const urls = await Url.find({ websiteId: w._id }).sort({ createdAt: 1 }).lean();
+    return { ...w, urls };
+  }));
+
+  return NextResponse.json({ websites: withUrls, total, page, pages: Math.ceil(total / limit) });
 }
 
 export async function POST(req: NextRequest) {
@@ -54,15 +61,25 @@ export async function POST(req: NextRequest) {
 
   const domain = parsed.hostname.replace('www.', '');
   const name = domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1);
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   const cleanUrl = parsed.origin;
 
-  const existing = await Website.findOne({ url });
-  if (existing) return NextResponse.json({ website: existing });
+  const existing = await Website.findOne({ slug });
+  if (existing) {
+    const urls = await Url.find({ websiteId: existing._id }).lean();
+    return NextResponse.json({ website: { ...existing, urls } });
+  }
 
   const website = await Website.create({
+    name, slug, domain,
+    status: 'active',
+  });
+
+  await Url.create({
+    websiteId: website._id,
     url: cleanUrl,
     domain,
-    brand: { name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, '-') },
+    kind: 'homepage',
     status: 'active',
   });
 
@@ -96,10 +113,13 @@ export async function DELETE(req: NextRequest) {
   if (!websiteId) return NextResponse.json({ error: 'websiteId required' }, { status: 400 });
   await connectDB();
   await Website.findByIdAndDelete(websiteId);
+  const urls = await Url.find({ websiteId }).select('_id').lean();
+  await Url.deleteMany({ websiteId });
   if (deleteOffers) {
+    const urlIds = urls.map(u => u._id);
     const mongoose = await connectDB();
     const db = mongoose.connection.db as any;
-    await db.collection('offers').deleteMany({ store_slug: websiteId });
+    await db.collection('offers').deleteMany({ websiteId, urlId: { $in: urlIds } });
   }
   return NextResponse.json({ ok: true });
 }
