@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { adminHeaders } from '@/lib/adminFetch';
 
 export default function ReviewPage() {
   const [offers, setOffers] = useState<any[]>([]);
@@ -19,7 +20,7 @@ export default function ReviewPage() {
     if (!window.confirm(` ${status} this offer?`)) return;
     await window.fetch('/api/admin/offers', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify({ offerId: id, status }),
     });
     load();

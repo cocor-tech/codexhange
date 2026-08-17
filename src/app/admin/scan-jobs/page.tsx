@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { adminHeaders } from '@/lib/adminFetch';
 
 export default function ScanJobsPage() {
   const [jobs, setJobs] = useState<any[]>([]);
@@ -26,7 +27,7 @@ export default function ScanJobsPage() {
     try {
       const res = await window.fetch('/api/admin/scan-jobs/trigger', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: adminHeaders(),
         body: JSON.stringify({ url: '', websiteId: '' }),
       });
       const data = await res.json();

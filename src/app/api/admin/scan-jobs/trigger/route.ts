@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/requireAdmin';
 import { connectDB } from '@/lib/mongoose';
 import ScanJob from '@/lib/models/ScanJob';
 
@@ -9,6 +10,8 @@ const GH_REPO = process.env.GH_REPO || 'cocor-tech/codexhange';
 const GH_WORKFLOW = 'bot-discovery.yml';
 
 export async function POST(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { websiteId, url, source_type } = await req.json().catch(() => ({}));
 
   const token = process.env.GH_PAT;

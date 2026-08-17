@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { adminHeaders } from '@/lib/adminFetch';
 
 export default function SettingsPage() {
   const [aiProvider, setAiProvider] = useState('');
@@ -66,7 +67,7 @@ export default function SettingsPage() {
     }
     const res = await window.fetch('/api/admin/settings', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify({ provider: aiProvider, api_key: aiKey, model: aiModel, base_url: aiBaseUrl, enabled: aiEnabled }),
     });
     if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 2500); }

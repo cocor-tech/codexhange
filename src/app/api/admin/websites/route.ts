@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/requireAdmin';
 import { connectDB } from '@/lib/mongoose';
 import Website from '@/lib/models/Website';
 import ScanJob from '@/lib/models/ScanJob';
@@ -37,6 +38,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { url } = await req.json();
   if (!url || typeof url !== 'string') return NextResponse.json({ error: 'Valid URL required' }, { status: 400 });
 
@@ -77,6 +80,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { websiteId, ...updates } = await req.json();
   if (!websiteId) return NextResponse.json({ error: 'websiteId required' }, { status: 400 });
   await connectDB();
@@ -85,6 +90,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { websiteId, deleteOffers } = await req.json();
   if (!websiteId) return NextResponse.json({ error: 'websiteId required' }, { status: 400 });
   await connectDB();

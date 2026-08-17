@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/requireAdmin';
 import { connectDB } from '@/lib/mongoose';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { provider, api_key, model, enabled, base_url } = await req.json();
 
   const validProviders = ['', 'gemini', 'openai', 'groq', 'huggingface'];

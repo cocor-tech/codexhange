@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { adminHeaders } from '@/lib/adminFetch';
 
 export default function WebsitesPage() {
   const [websites, setWebsites] = useState<any[]>([]);
@@ -28,7 +29,7 @@ export default function WebsitesPage() {
     try {
       const res = await window.fetch('/api/admin/websites', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: adminHeaders(),
         body: JSON.stringify({ url: addUrl.trim() }),
       });
       const data = await res.json();
@@ -47,7 +48,7 @@ export default function WebsitesPage() {
     try {
       await window.fetch('/api/admin/websites', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: adminHeaders(),
         body: JSON.stringify({ websiteId: id, deleteOffers: delOffers }),
       });
       load();

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/requireAdmin';
 import mongoose from 'mongoose';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { brandId } = await req.json();
   if (!brandId) return NextResponse.json({ error: 'brandId required' }, { status: 400 });
 

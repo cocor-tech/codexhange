@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { adminHeaders } from '@/lib/adminFetch';
 
 type ScanResult = {
   url: string;
@@ -56,7 +57,7 @@ export default function ScannerPage() {
       const brand = selectedBrand ? brands.find(b => b._id === selectedBrand) : null;
       const res = await window.fetch('/api/admin/scan-jobs/trigger', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: adminHeaders(),
         body: JSON.stringify({ url, websiteId: brand?._id || '', source_type: 'manual' }),
       });
       const data = await res.json();

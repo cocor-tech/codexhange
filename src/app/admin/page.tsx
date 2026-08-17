@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import Link from 'next/link';
+import { adminHeaders } from '@/lib/adminFetch';
 
 type SessionState = {
   authenticated: boolean;
@@ -254,7 +255,7 @@ export default function AdminPage() {
                 const btn = document.activeElement as HTMLButtonElement;
                 if (btn) { btn.textContent = 'Running...'; btn.disabled = true; }
                 await window.fetch('/api/admin/scan-progress', {
-                  method: 'POST', headers: {'Content-Type': 'application/json'},
+                  method: 'POST', headers: adminHeaders(),
                   body: JSON.stringify({ action: 'start' })
                 });
                 setTimeout(() => { window.location.reload(); }, 2000);
@@ -282,7 +283,7 @@ export default function AdminPage() {
                   {scanProgress.status === 'running' && (
                     <button onClick={async () => {
                       await window.fetch('/api/admin/scan-progress', {
-                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        method: 'POST', headers: adminHeaders(),
                         body: JSON.stringify({ action: 'pause' })
                       });
                     }} className="btn-glass px-3 py-1 text-xs">Pause</button>
@@ -290,7 +291,7 @@ export default function AdminPage() {
                   {scanProgress.status === 'paused' && (
                     <button onClick={async () => {
                       await window.fetch('/api/admin/scan-progress', {
-                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        method: 'POST', headers: adminHeaders(),
                         body: JSON.stringify({ action: 'continue' })
                       });
                     }} className="btn-glass px-3 py-1 text-xs">Continue</button>

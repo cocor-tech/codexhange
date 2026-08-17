@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/requireAdmin';
 import { connectDB } from '@/lib/mongoose';
 import Category from '@/lib/models/Category';
 import Brand from '@/lib/models/Brand';

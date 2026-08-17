@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/requireAdmin';
 import { connectDB } from '@/lib/mongoose';
 import Category from '@/lib/models/Category';
 
@@ -11,6 +12,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const body = await req.json();
   if (!body.name) return NextResponse.json({ error: 'Name required' }, { status: 400 });
   await connectDB();
@@ -22,6 +25,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { categoryId, ...updates } = await req.json();
   if (!categoryId) return NextResponse.json({ error: 'categoryId required' }, { status: 400 });
   await connectDB();
@@ -30,6 +35,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { categoryId } = await req.json();
   if (!categoryId) return NextResponse.json({ error: 'categoryId required' }, { status: 400 });
   await connectDB();

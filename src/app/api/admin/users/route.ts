@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/requireAdmin';
 import { connectDB } from '@/lib/mongoose';
 import User from '@/lib/models/User';
 
@@ -25,6 +26,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { userId, action } = await req.json();
   if (!userId || !['toggle-admin'].includes(action)) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });

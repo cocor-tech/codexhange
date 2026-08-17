@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import { adminHeaders } from '@/lib/adminFetch';
 
 export default function OfferDetailPage() {
   const { id } = useParams();
@@ -21,7 +22,7 @@ export default function OfferDetailPage() {
     if (!window.confirm(` ${status} this offer?`)) return;
     const res = await window.fetch('/api/admin/offers', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify({ offerId: id, status }),
     });
     if (res.ok) window.location.reload();

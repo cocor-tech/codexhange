@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/requireAdmin';
 import { connectDB } from '@/lib/mongoose';
 import Offer from '@/lib/models/Offer';
 import OfferHistory from '@/lib/models/OfferHistory';
@@ -80,6 +81,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const body = await req.json();
   if (!body.serviceId || !body.title || !body.discount) {
     return NextResponse.json({ error: 'serviceId, title, and discount required' }, { status: 400 });
@@ -101,6 +104,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { offerId, ...updates } = await req.json();
   if (!offerId) return NextResponse.json({ error: 'offerId required' }, { status: 400 });
 
@@ -139,6 +144,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { offerId } = await req.json();
   if (!offerId) return NextResponse.json({ error: 'offerId required' }, { status: 400 });
   await connectDB();

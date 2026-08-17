@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/requireAdmin';
 import { connectDB } from '@/lib/mongoose';
 import Code from '@/lib/models/Code';
 
@@ -33,6 +34,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { codeId, action } = await req.json();
   if (!codeId || !['archive', 'unarchive'].includes(action)) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
@@ -51,6 +54,8 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { codeId } = await req.json();
   if (!codeId) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
 

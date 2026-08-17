@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/requireAdmin';
 import { connectDB } from '@/lib/mongoose';
 import ScanJob from '@/lib/models/ScanJob';
 
@@ -24,6 +25,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { websiteId, url, source_type } = await req.json();
   if (!websiteId || !url) return NextResponse.json({ error: 'websiteId and url required' }, { status: 400 });
 
