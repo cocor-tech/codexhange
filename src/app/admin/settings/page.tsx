@@ -10,6 +10,25 @@ export default function SettingsPage() {
   const [aiBaseUrl, setAiBaseUrl] = useState('');
   const [aiEnabled, setAiEnabled] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const testConnection = async () => {
+    if (!aiProvider || !aiKey) { setTestResult({ ok: false, message: 'Provider + API key required' }); return; }
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await window.fetch('/api/admin/settings/test', {
+        method: 'POST', headers: adminHeaders(),
+        body: JSON.stringify({ provider: aiProvider, api_key: aiKey, model: aiModel, base_url: aiBaseUrl }),
+      });
+      const d = await res.json();
+      setTestResult({ ok: !!d.ok, message: d.message || (d.ok ? 'OK' : 'Failed') });
+    } catch {
+      setTestResult({ ok: false, message: 'Network error' });
+    }
+    setTesting(false);
+  };
 
   const providerDefaults: Record<string, { baseUrl: string; models: { value: string; label: string }[] }> = {
     gemini: {
@@ -33,6 +52,15 @@ export default function SettingsPage() {
       models: [
         { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
         { value: 'gpt-4o', label: 'GPT-4o' },
+      ],
+    },
+    openrouter: {
+      baseUrl: 'https://openrouter.ai/api/v1',
+      models: [
+        { value: 'nvidia/nemotron-3-ultra-550b-a55b:free', label: 'Nemotron 3 Ultra 550B (free)' },
+        { value: 'deepseek/deepseek-chat-v3-0324:free', label: 'DeepSeek V3 (free)' },
+        { value: 'meta-llama/llama-3.3-70b-instruct:free', label: 'LLaMA 3.3 70B (free)' },
+        { value: 'google/gemini-2.0-flash-exp:free', label: 'Gemini 2.0 Flash (free)' },
       ],
     },
   };
@@ -98,6 +126,7 @@ export default function SettingsPage() {
                   <option value="gemini">Gemini (Google, free tier)</option>
                   <option value="groq">Groq (fast inference, free tier)</option>
                   <option value="openai">OpenAI</option>
+                  <option value="openrouter">OpenRouter (any model, free tier)</option>
                 </select>
               </div>
               <div>
@@ -107,7 +136,7 @@ export default function SettingsPage() {
                   className="input-glass px-3 py-2 text-sm w-full"
                   type="password" />
               </div>
-              {aiProvider === 'groq' || aiProvider === 'openai' ? (
+              {aiProvider === 'groq' || aiProvider === 'openai' || aiProvider === 'openrouter' ? (
                 <div>
                   <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Base URL</label>
                   <input value={aiBaseUrl} onChange={e => setAiBaseUrl(e.target.value)}
@@ -153,7 +182,17 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          <button onClick={save} className="btn-primary px-5 py-2 text-sm">{saved ? 'Saved ✓' : 'Save Settings'}</button>
+          <div className="flex items-center gap-3">
+            <button onClick={save} className="btn-primary px-5 py-2 text-sm">{saved ? 'Saved ✓' : 'Save Settings'}</button>
+            <button onClick={testConnection} disabled={testing} className="btn-glass px-4 py-2 text-sm">
+              {testing ? 'Testing…' : 'Test Connection'}
+            </button>
+            {testResult && (
+              <span className="text-xs" style={{ color: testResult.ok ? '#22c55e' : '#ef4444' }}>
+                {testResult.ok ? '✓ ' : '✗ '}{testResult.message}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

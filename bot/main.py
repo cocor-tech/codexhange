@@ -401,7 +401,7 @@ async def discover_from_sources(max_per_source=80, force=False):
                         resolved_id = mdoc["_id"]
 
                 # -- scan the source brand page for codes --
-                result = await scan_source(client, page_url, bname)
+                result = await scan_source(client, page_url, bname, db=db)
                 if result.get("blocked"):
                     db["urls"].update_one({"_id": url_id}, {"$inc": {"stats.blocked_count": 1}})
                     continue
@@ -428,6 +428,55 @@ async def discover_from_sources(max_per_source=80, force=False):
                     db.offers.delete_many({"websiteId": ws_id, "sourceUrl": page_url, "status": {"$ne": "published"}})
                     db.offers.insert_one(doc)
                     offers += 1
+
+                # -- crawl AI-detected promo/coupon links found on the brand page --
+                for promo_url in result.get("promo_links", [])[:3]:
+                    try:
+                        full = urljoin(page_url, promo_url)
+                    except Exception:
+                        continue
+                    if not same_host(full, page_url):
+                        continue
+                    pdoc = db["urls"].find_one({"url": full})
+                    if not pdoc:
+                        p_url_id = db["urls"].insert_one({
+                            "websiteId": ws_id, "url": full,
+                            "domain": canonical_domain(full),
+                            "kind": "coupon_page", "source": sname, "status": "active",
+                            "stats": {"offers_found": 0, "blocked_count": 0, "health_score": 100},
+                            "createdAt": now, "updatedAt": now,
+                        }).inserted_id
+                    else:
+                        p_url_id = pdoc["_id"]
+                        db["urls"].update_one({"_id": p_url_id},
+                            {"$set": {"websiteId": ws_id, "source": sname, "updatedAt": now}})
+
+                    pres = await scan_source(client, full, bname, db=db)
+                    if pres.get("blocked") or not pres.get("success"):
+                        continue
+                    if pres.get("codes"):
+                        pcode = pres["codes"][0]
+                        pdeal = Deal(
+                            store_name=bname,
+                            deal_type=pres.get("deal_type", "code" if pcode else "sale"),
+                            code=pcode,
+                            title=str(pres.get("title") or f"{bname} offer")[:200],
+                            destination_url=full,
+                            source_page=full,
+                            confidence_score=85 if pcode else 60,
+                            strategy="source_discovery",
+                            countries=pres.get("countries", []),
+                            discount_value=pres.get("discount", ""),
+                        )
+                        pdoc_b = build_document(pdeal, ws_id, {"name": bname, "slug": slug})
+                        pdoc_b["store_name"] = bname
+                        pdoc_b["websiteId"] = ws_id
+                        pdoc_b["urlId"] = p_url_id
+                        db.offers.delete_many({"websiteId": ws_id, "sourceUrl": full, "status": {"$ne": "published"}})
+                        db.offers.insert_one(pdoc_b)
+                        offers += 1
+                    db["urls"].update_one({"_id": p_url_id},
+                        {"$set": {"stats.last_scan": now, "stats.offers_found": 1 if pres.get("codes") else 0}})
 
                 db["urls"].update_one({"_id": url_id},
                     {"$set": {"stats.last_scan": now, "stats.offers_found": offers}})

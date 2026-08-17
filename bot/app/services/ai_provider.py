@@ -40,13 +40,17 @@ def get_provider(provider_name: str = "", api_key: str = "", model: str = "", ba
         from app.services.ai_gemini import GeminiProvider
         return GeminiProvider(key, mdl or "gemini-2.0-flash")
 
-    if name in ("openai", "groq") and key:
+    if name in ("openai", "groq", "openrouter") and key:
         from app.services.ai_openai import OpenAIProvider
         if not url:
             if name == "groq":
                 url = "https://api.groq.com/openai/v1"
+            elif name == "openrouter":
+                url = "https://openrouter.ai/api/v1"
             else:
                 url = "https://api.openai.com/v1"
-        return OpenAIProvider(key, mdl or "gpt-4o-mini", url)
+        if not mdl:
+            mdl = "nvidia/nemotron-3-ultra-550b-a55b:free" if name == "openrouter" else "gpt-4o-mini"
+        return OpenAIProvider(key, mdl, url)
 
     return NullProvider()

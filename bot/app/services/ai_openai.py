@@ -35,7 +35,7 @@ class OpenAIProvider:
         messages.append({"role": "user", "content": prompt})
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as c:
+            async with httpx.AsyncClient(timeout=30.0) as c:
                 r = await c.post(
                     self.endpoint,
                     headers={
@@ -111,3 +111,95 @@ Tags:"""
             except:
                 pass
         return []
+
+    async def detect_codes(self, page_text: str, brand_name: str = "") -> list:
+        """Extract promo/coupon codes from scraped page text (AI fallback for regex)."""
+        snippet = page_text[:6000]
+        prompt = f"""You are extracting coupon codes from a scraped retail page for "{brand_name or 'the store'}".
+
+Find ALL literal promo/coupon/voucher/discount codes on this page. Codes are:
+- uppercase or mixed alphanumeric strings, usually 4-25 chars (e.g. SAVE20, WELCOME10, FALL25, FREESHIP)
+- often inside quotes, near words like "code", "coupon", "promo", "voucher", "offer"
+- NOT random words, menu items, prices, or dates
+
+Return ONLY a JSON array of unique code strings. If none exist, return [].
+
+Page text:
+{snippet}
+
+Codes:"""
+        result = await self._call(prompt, "You extract coupon codes. Reply with JSON only.")
+        if not result:
+            return []
+        try:
+            codes = json.loads(result.strip())
+            if isinstance(codes, list):
+                return [str(c).strip() for c in codes if str(c).strip()]
+        except Exception:
+            import re
+            m = re.search(r'\[.*\]', result, re.S)
+            if m:
+                try:
+                    codes = json.loads(m.group(0))
+                    if isinstance(codes, list):
+                        return [str(c).strip() for c in codes if str(c).strip()]
+                except Exception:
+                    pass
+        return []
+
+    async def classify_promo_links(self, links: list, brand_name: str = "") -> list:
+        """Given [{href, text}] same-host links, return the hrefs that lead to
+        promo / discount / coupon pages (not products, not categories, not cart)."""
+        if not links:
+            return []
+        chunk = links[:120]
+        payload = "\n".join(f"{i}. {l['href']} | {l.get('text', '')[:60]}" for i, l in enumerate(chunk))
+        prompt = f"""From this list of links found on "{brand_name or 'a coupon aggregator'}"'s page,
+select the ones that lead to pages containing promo codes, coupons, discounts, deals, or vouchers.
+
+EXCLUDE: product pages, categories, cart/checkout, login, about/help pages, blog posts, sitemaps.
+A link is "promo" if its URL path or anchor text suggests coupons/codes/deals (e.g. /coupons, /promo-codes,
+/deals, /discount, "all coupons", "printable coupons", "today's deals").
+
+Return ONLY a JSON array of the selected URL strings. If none, return [].
+
+{payload}
+
+Selected promo URLs:"""
+        result = await self._call(prompt, "You select promo/coupon page links. Reply with JSON only.")
+        if not result:
+            return []
+        try:
+            urls = json.loads(result.strip())
+            if isinstance(urls, list):
+                return [str(u).strip() for u in urls if str(u).strip()]
+        except Exception:
+            import re
+            m = re.search(r'\[.*\]', result, re.S)
+            if m:
+                try:
+                    urls = json.loads(m.group(0))
+                    if isinstance(urls, list):
+                        return [str(u).strip() for u in urls if str(u).strip()]
+                except Exception:
+                    pass
+        return []
+
+    async def test_connection(self) -> tuple:
+        """Return (ok, message). Verifies key + model reachable."""
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as c:
+                r = await c.post(
+                    self.endpoint,
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={"model": self.model, "messages": [{"role": "user", "content": "ping"}],
+                          "max_tokens": 5},
+                )
+                if r.status_code == 200:
+                    return True, "OK"
+                return False, f"HTTP {r.status_code}: {r.text[:200]}"
+        except Exception as e:
+            return False, str(e)[:200]

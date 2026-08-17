@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   if (authError) return authError;
   const { provider, api_key, model, enabled, base_url } = await req.json();
 
-  const validProviders = ['', 'gemini', 'openai', 'groq', 'huggingface'];
+  const validProviders = ['', 'gemini', 'openai', 'groq', 'openrouter'];
   if (!validProviders.includes(provider)) {
     return NextResponse.json({ error: 'Invalid provider' }, { status: 400 });
   }

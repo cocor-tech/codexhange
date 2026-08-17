@@ -5,14 +5,16 @@ Used both by the batch pipeline and the admin Deal Scanner.
 from bs4 import BeautifulSoup
 from app.services.fetcher import smart_fetch, fetch_direct, is_cloudflare
 from app.extractors import extract_codes_from_soup, detect_countries, extract_discount_value, extract_expiry
+from app.extractors.codes import validate_code
 from app.services.classifier import classify
+from app.services.ai_provider import get_provider
 
-async def scan_source(client, url: str, brand_name: str = "") -> dict:
+async def scan_source(client, url: str, brand_name: str = "", db=None) -> dict:
     url = url.strip().rstrip("/")
     result = {
         "url": url, "success": False, "status": 0, "source": "direct",
         "blocked": False, "blocked_reason": "", "title": "", "codes": [],
-        "countries": [], "deal_type": "", "discount": "", "expiry": None,
+        "promo_links": [], "countries": [], "deal_type": "", "discount": "", "expiry": None,
         "error": "",
     }
     try:
@@ -43,6 +45,44 @@ async def scan_source(client, url: str, brand_name: str = "") -> dict:
         result["expiry"] = extract_expiry(soup.get_text())
         result["deal_type"] = classify(result["title"], "", result["codes"][0] if result["codes"] else None)
         result["success"] = True
+
+        # -- AI fallback: extract codes + promo links the regex missed --
+        try:
+            if db is not None:
+                from app.workers.enricher import load_provider
+                provider = load_provider(db)
+            else:
+                provider = get_provider()
+        except Exception:
+            provider = None
+
+        if provider is not None:
+            try:
+                ai_codes = await provider.detect_codes(soup.get_text(), brand_name)
+                if ai_codes:
+                    seen = set(result["codes"])
+                    for c in ai_codes:
+                        v = validate_code(c)
+                        if v and v not in seen:
+                            result["codes"].append(v)
+                            seen.add(v)
+            except Exception:
+                pass
+
+            try:
+                links = []
+                for a in soup.find_all("a", href=True):
+                    href = a["href"].strip()
+                    if href.startswith("#") or href.startswith("javascript:"):
+                        continue
+                    txt = a.get_text(strip=True)
+                    if not txt:
+                        continue
+                    links.append({"href": href, "text": txt[:80]})
+                ai_links = await provider.classify_promo_links(links, brand_name)
+                result["promo_links"] = [l for l in ai_links if l.startswith("http")][:5]
+            except Exception:
+                pass
 
     except Exception as e:
         result["error"] = str(e)[:200]
