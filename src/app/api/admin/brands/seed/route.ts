@@ -3,7 +3,11 @@ import { connectDB } from '@/lib/mongoose';
 import Category from '@/lib/models/Category';
 import Brand from '@/lib/models/Brand';
 import Service from '@/lib/models/Service';
+import Website from '@/lib/models/Website';
+import ScanJob from '@/lib/models/ScanJob';
 import { allBrands } from '@/lib/data/brands';
+
+const SCAN_PATTERNS = ['/coupons', '/promo', '/promo-codes', '/discount', '/deals', '/offers', '/sale'];
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +30,8 @@ export async function POST() {
   let brandsCreated = 0;
   let brandsSkipped = 0;
   let servicesCreated = 0;
+  let websitesCreated = 0;
+  let scanJobsCreated = 0;
 
   for (const entry of allBrands) {
     const catId = await getOrCreateCategory(entry.category);
@@ -70,18 +76,41 @@ export async function POST() {
       });
       servicesCreated++;
     }
+
+    const website = await Website.findOne({ 'brand.slug': slug });
+    if (!website && entry.website) {
+      let domain = '';
+      try {
+        domain = new URL(entry.website).hostname.replace(/^www\./, '');
+      } catch {
+        domain = entry.website.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
+      }
+      await Website.create({
+        url: entry.website,
+        domain,
+        brand: { name: entry.name, slug, category: entry.category },
+        status: 'active',
+        settings: { scan_frequency: 12, crawl_depth: 2, javascript: false, auto_publish: false, ai_enabled: false },
+        stats: { offers_found: 0, offers_published: 0, blocked_count: 0, success_rate: 0, health_score: 100 },
+      });
+      websitesCreated++;
+    }
   }
 
   const totalBrands = await Brand.countDocuments({});
   const totalServices = await Service.countDocuments({});
   const totalCategories = await Category.countDocuments({});
+  const totalWebsites = await Website.countDocuments({});
 
   return NextResponse.json({
     brandsCreated,
     brandsSkipped,
     servicesCreated,
+    websitesCreated,
+    scanJobsCreated,
     totalBrands,
     totalServices,
     totalCategories,
+    totalWebsites,
   });
 }

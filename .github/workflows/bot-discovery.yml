@@ -45,10 +45,7 @@ jobs:
         working-directory: bot
 
       - name: Process admin queued jobs
-        run: |
-          while python main.py --process-jobs; do
-            echo "Processing next job..."
-          done
+        run: python main.py --process-jobs
         working-directory: bot
 
       - name: Check if this is the 6am UTC run (full discovery)
