@@ -44,5 +44,7 @@ export async function DELETE(req: NextRequest) {
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
 
   if (token) clearSession(token);
-  return NextResponse.json({ ok: true });
+  const res = NextResponse.json({ ok: true });
+  res.cookies.set('admin_session', '', { httpOnly: true, sameSite: 'lax', secure: true, path: '/', maxAge: 0 });
+  return res;
 }

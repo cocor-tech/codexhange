@@ -141,7 +141,11 @@ export async function POST(req: NextRequest) {
     }
 
     const token = createSession(email);
-    return NextResponse.json({ ok: true, token });
+    const res = NextResponse.json({ ok: true, token });
+    res.cookies.set('admin_session', token, {
+      httpOnly: true, sameSite: 'lax', secure: true, path: '/', maxAge: 24 * 60 * 60,
+    });
+    return res;
   }
 
   return NextResponse.json({ error: 'Invalid request' }, { status: 400 });

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/requireAdmin';
 import { connectDB } from '@/lib/mongoose';
 import Website from '@/lib/models/Website';
 import Url from '@/lib/models/Url';
@@ -6,6 +7,8 @@ import Url from '@/lib/models/Url';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   await connectDB();
   const doc = await Website.findById(params.id).lean() as any;
   if (!doc) return NextResponse.json({ error: 'Not found' }, { status: 404 });

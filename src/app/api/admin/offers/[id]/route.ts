@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/requireAdmin';
 import { connectDB } from '@/lib/mongoose';
 import Offer from '@/lib/models/Offer';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   await connectDB();
   const mongoose = await connectDB();
   const db = mongoose.connection.db as any;

@@ -5,7 +5,9 @@ import Category from '@/lib/models/Category';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   await connectDB();
   const categories = await Category.find({}).sort({ order: 1, name: 1 }).lean();
   return NextResponse.json({ categories });

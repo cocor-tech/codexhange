@@ -6,6 +6,8 @@ import Code from '@/lib/models/Code';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { searchParams } = new URL(req.url);
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '50');

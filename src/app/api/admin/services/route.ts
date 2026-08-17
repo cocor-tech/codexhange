@@ -6,6 +6,8 @@ import Service from '@/lib/models/Service';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  const authError = await requireAdmin(req);
+  if (authError) return authError;
   const { searchParams } = new URL(req.url);
   const brandId = searchParams.get('brandId');
   const page = parseInt(searchParams.get('page') || '1');
