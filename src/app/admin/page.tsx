@@ -263,18 +263,19 @@ export default function AdminPage() {
             <div className="flex gap-2">
               <button
                 onClick={async () => {
-                  if (!window.confirm('Verify DB state? Brands are discovered automatically by the bot from crawl sources.')) return;
+                  if (!window.confirm('PURGE all brands, brand websites and their offers? (Sources are kept. This cannot be undone.)')) return;
                   const btn = document.activeElement as HTMLButtonElement;
-                  if (btn) { btn.textContent = 'Checking...'; btn.disabled = true; }
-                  const res = await window.fetch('/api/admin/brands/seed', {
+                  if (btn) { btn.textContent = 'Purging...'; btn.disabled = true; }
+                  const res = await window.fetch('/api/admin/brands/purge', {
                     method: 'POST', headers: adminHeaders(),
                   });
                   const d = await res.json().catch(() => ({}));
-                  if (btn) { btn.textContent = 'Check DB'; btn.disabled = false; }
-                  msg(d.error ? `❌ ${d.error}` : `✅ ${d.totalBrands} brands, ${d.totalWebsites} websites in DB`);
+                  if (btn) { btn.textContent = 'Purge Old Brands'; btn.disabled = false; }
+                  msg(d.error ? `❌ ${d.error}` : `✅ Purged ${d.brandsDeleted} brands, ${d.websitesDeleted} websites, ${d.offersDeleted} offers`);
                 }}
                 className="btn-glass px-4 py-2 text-xs"
-              >Check DB</button>
+                style={{ color: '#ef4444', borderColor: '#ef4444' }}
+              >Purge Old Brands</button>
               <button onClick={async () => {
                 const btn = document.activeElement as HTMLButtonElement;
                 if (btn) { btn.textContent = 'Running...'; btn.disabled = true; }
