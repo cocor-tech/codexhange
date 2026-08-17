@@ -28,6 +28,7 @@ async function ensureIndexes() {
 export async function connectDB() {
   if (cached) return cached;
   const conn = await mongoose.connect(MONGODB_URI, {
+    dbName: process.env.MONGODB_DB || 'codexhange',
     serverSelectionTimeoutMS: 5000,
     connectTimeoutMS: 5000,
   });
