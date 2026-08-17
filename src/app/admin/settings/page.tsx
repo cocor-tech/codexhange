@@ -146,23 +146,21 @@ export default function SettingsPage() {
               ) : null}
               <div>
                 <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-muted)' }}>Model</label>
-                <select value={aiModel} onChange={e => setAiModel(e.target.value)}
-                  className="input-glass px-3 py-2 text-sm w-full" style={{ color: 'var(--text-primary)' }}>
-                  {(providerDefaults[aiProvider]?.models || []).length > 0
-                    ? providerDefaults[aiProvider].models.map(m => (
-                        <option key={m.value} value={m.value}>{m.label}</option>
-                      ))
-                    : (
-                      <>
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash (free, recommended)</option>
-                        <option value="gemini-2.0-flash-lite">Gemini 2.0 Flash-Lite (free, faster)</option>
-                        <option value="gpt-4o-mini">GPT-4o Mini</option>
-                        <option value="llama3-70b-8192">LLaMA 3 70B (Groq)</option>
-                        <option value="llama3-8b-8192">LLaMA 3 8B (Groq)</option>
-                      </>
-                    )
-                  }
-                </select>
+                <input list="ai-model-suggestions" value={aiModel} onChange={e => setAiModel(e.target.value)}
+                  placeholder="Type any model name (e.g. nvidia/nemotron-3-ultra-550b-a55b:free)"
+                  className="input-glass px-3 py-2 text-sm w-full font-mono text-xs"
+                  style={{ color: 'var(--text-primary)' }} />
+                <datalist id="ai-model-suggestions">
+                  {(providerDefaults[aiProvider]?.models || []).map(m => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                  <option value="gemini-2.0-flash" />
+                  <option value="gemini-2.0-flash-lite" />
+                  <option value="gpt-4o-mini" />
+                  <option value="gpt-4o" />
+                  <option value="llama3-70b-8192" />
+                  <option value="llama3-8b-8192" />
+                </datalist>
               </div>
               <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
                 <input type="checkbox" checked={aiEnabled} onChange={e => setAiEnabled(e.target.checked)} />
