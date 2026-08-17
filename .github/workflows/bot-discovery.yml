@@ -48,7 +48,7 @@ jobs:
           python -m playwright install --with-deps chromium
         working-directory: bot
 
-      - name: Reset bot data (websites/urls/offers), keep sources
+      - name: Full reset — wipe all data (sources, users, offers, websites, urls)
         if: inputs.reset == true
         run: python main.py --reset
         working-directory: bot
@@ -61,9 +61,9 @@ jobs:
         run: |
           MAX="${{ inputs.maxBrands }}"
           if [ -n "$MAX" ]; then
-            python main.py --sources --max-per-source "$MAX"
+            python main.py --sources --force --max-per-source "$MAX"
           else
-            python main.py --sources
+            python main.py --sources --force
           fi
         working-directory: bot
 

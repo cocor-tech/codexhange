@@ -6,6 +6,7 @@ export interface IWebsite extends Document {
   domain: string;
   logo?: string;
   category?: string;
+  scanLevel?: 1 | 2 | 3;
   status: 'active' | 'paused' | 'blocked';
   settings: {
     scan_frequency: number;
@@ -35,6 +36,7 @@ const WebsiteSchema = new Schema<IWebsite>(
     domain: { type: String, required: true, lowercase: true, unique: true },
     logo: { type: String },
     category: { type: String },
+    scanLevel: { type: Number, enum: [1, 2, 3], default: 2 },
     status: {
       type: String,
       enum: ['active', 'paused', 'blocked'],

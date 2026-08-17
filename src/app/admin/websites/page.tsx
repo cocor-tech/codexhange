@@ -60,6 +60,10 @@ export default function WebsitesPage() {
     if (score >= 50) return '#f59e0b';
     return '#ef4444';
   };
+  const levelColor = (l?: number) => {
+    const m: Record<number, string> = { 1: '#22c55e', 2: '#f59e0b', 3: '#ef4444' };
+    return m[l || 2] || '#6b7280';
+  };
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: 'var(--color-bg-base)' }}>
@@ -111,6 +115,9 @@ export default function WebsitesPage() {
                       }`}>{w.status}</span>
                       <span className="text-[10px] rounded-full px-1.5 py-0.5" style={{ backgroundColor: `${healthColor(w.stats?.health_score || 100)}20`, color: healthColor(w.stats?.health_score || 100) }}>
                         {w.stats?.health_score || 100}%
+                      </span>
+                      <span className="text-[10px] rounded-full px-1.5 py-0.5 font-semibold" style={{ backgroundColor: `${levelColor(w.scanLevel)}20`, color: levelColor(w.scanLevel) }}>
+                        L{w.scanLevel || 2}
                       </span>
                     </div>
                     <p className="text-xs truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>

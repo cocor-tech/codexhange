@@ -1,4 +1,4 @@
-import asyncio, os, argparse, logging, re
+import asyncio, os, argparse, logging, re, time
 from datetime import datetime, timezone, timedelta
 from urllib.parse import urljoin, urlparse
 from dotenv import load_dotenv
@@ -199,15 +199,30 @@ async def process_website(db, site, client):
     print(f"  {Fore.GREEN}[+] {brand_name:<20} found={len(normal)} submitted={submitted} {bc}{Style.RESET_ALL}")
 
 async def discover_all(max_brands=None, stale_hours=None, names=None):
+    """Scan active websites, grouped by scan level: level 1 (fast) every run,
+    level 2 after 24h, level 3 (slow) after 72h."""
     db = connect()
     query = {"status": "active"}
     if stale_hours:
         cutoff = datetime.now(timezone.utc) - timedelta(hours=stale_hours)
         query["$or"] = [{"stats.last_scan": {"$lt": cutoff}}, {"stats.last_scan": None}]
+    else:
+        now = datetime.now(timezone.utc)
+        ors = []
+        for lvl, hours in LEVEL_INTERVALS.items():
+            cut = now - timedelta(hours=hours)
+            ors.append({"scanLevel": lvl, "stats.last_scan": {"$lt": cut}})
+            ors.append({"scanLevel": lvl, "stats.last_scan": None})
+        ors.append({"scanLevel": {"$exists": False}, "stats.last_scan": {"$lt": now - timedelta(hours=12)}})
+        ors.append({"scanLevel": {"$exists": False}, "stats.last_scan": None})
+        query["$or"] = ors
     if names:
         query["name"] = {"$in": names}
-    sites = list(db["websites"].find(query).sort([("stats.last_scan", 1), ("name", 1)]).limit(max_brands or 500))
-    print(f"{Fore.CYAN}=== Scanning {len(sites)} websites ==={Style.RESET_ALL}\n")
+    sites = list(db["websites"].find(query).sort([("scanLevel", 1), ("stats.last_scan", 1)]).limit(max_brands or 500))
+    levels = {}
+    for s in sites:
+        levels[s.get("scanLevel") or 0] = levels.get(s.get("scanLevel") or 0, 0) + 1
+    print(f"{Fore.CYAN}=== Scanning {len(sites)} websites (L1={levels.get(1,0)} L2={levels.get(2,0)} L3={levels.get(3,0)}) ==={Style.RESET_ALL}\n")
     async with create_shared_client() as client:
         async def worker(site):
             async with SEMAPHORE:
@@ -222,7 +237,45 @@ async def discover_all(max_brands=None, stale_hours=None, names=None):
     print(f"\n{Fore.CYAN}Done.{Style.RESET_ALL}")
     close()
 
-async def discover_from_sources(max_per_source=80):
+LEVEL_INTERVALS = {1: 6, 2: 24, 3: 72}      # hours until next scan per level
+LEVEL_MAX_PER_SOURCE = {1: 80, 2: 40, 3: 15}  # brand pages crawled per level
+LEVEL_MAX_TIME = {1: 8.0, 2: 12.0, 3: 15.0}   # homepage fetch timeout per level
+
+def classify_level(avg_scan_time: float) -> int:
+    """Level 1 = fast (<8s), 2 = medium (<20s), 3 = slow (>=20s)."""
+    if avg_scan_time < 8:
+        return 1
+    if avg_scan_time < 20:
+        return 2
+    return 3
+
+def upsert_website(db, slug: str, name: str, domain: str, level: int, now) -> str:
+    """Find by slug first, then by domain; insert last (DuplicateKey-safe)."""
+    ws = db["websites"].find_one({"slug": slug})
+    if not ws and domain:
+        ws = db["websites"].find_one({"domain": domain})
+    if ws:
+        db["websites"].update_one({"_id": ws["_id"]},
+            {"$set": {"name": name, "domain": domain or ws.get("domain", ""),
+                      "scanLevel": level, "updatedAt": now}})
+        return ws["_id"]
+    try:
+        return db["websites"].insert_one({
+            "name": name, "slug": slug, "domain": domain,
+            "scanLevel": level, "status": "active",
+            "settings": {"scan_frequency": 6, "crawl_depth": 1,
+                         "javascript": False, "auto_publish": True, "ai_enabled": False},
+            "stats": {"offers_found": 0, "offers_published": 0, "blocked_count": 0,
+                      "success_rate": 0, "health_score": 100},
+            "createdAt": now, "updatedAt": now,
+        }).inserted_id
+    except Exception:
+        ws = db["websites"].find_one({"slug": slug}) or db["websites"].find_one({"domain": domain})
+        if ws:
+            return ws["_id"]
+        raise
+
+async def discover_from_sources(max_per_source=80, force=False):
     """Crawl the sources collection (coupon aggregators) and discover brands + codes.
 
     New model:
@@ -230,14 +283,21 @@ async def discover_from_sources(max_per_source=80):
       - urls      = pages belonging to a website (homepage, source page, coupon page)
       - offers    = reference websiteId + urlId, destination_url = resolved merchant URL
     Redirect links ("Shop Now" buttons) are resolved to the real merchant URL.
+
+    Scan levels: sources are grouped by speed (1 fast / 2 medium / 3 slow) based on
+    measured scan time; each level is scanned on its own schedule (6h / 24h / 72h).
     """
-    from app.services.resolver import resolve_final_url, extract_outbound_links, looks_like_redirect, is_redirect_domain
+    from app.services.resolver import resolve_final_url, looks_like_redirect, is_redirect_domain
     from urllib.parse import urlparse as _up
 
     db = connect()
-    sources = list(db["sources"].find({"status": "active"}))
-    print(f"{Fore.CYAN}=== Source discovery: {len(sources)} sources ==={Style.RESET_ALL}\n")
     now = datetime.now(timezone.utc)
+    sources = list(db["sources"].find({"status": "active"}))
+    due = [s for s in sources if force or not s.get("nextScanAt") or s["nextScanAt"] <= now]
+    skipped = len(sources) - len(due)
+    if skipped:
+        print(f"{Fore.YELLOW}=== Skipping {skipped} sources not due yet (scan levels) ==={Style.RESET_ALL}")
+    print(f"{Fore.CYAN}=== Source discovery: {len(due)} due sources ==={Style.RESET_ALL}\n")
     total_brands, total_offers = 0, 0
 
     def canonical_domain(url: str) -> str:
@@ -247,16 +307,19 @@ async def discover_from_sources(max_per_source=80):
             return ""
 
     async with create_shared_client() as client:
-        for src in sources:
+        for src in due:
             sid = src["_id"]
             base = src.get("url", "").rstrip('/')
             sname = src.get("name", base)
             if not base:
                 continue
+            level = int(src.get("scanLevel") or 2)
+            cap = min(max_per_source, LEVEL_MAX_PER_SOURCE.get(level, 40))
+            started = time.monotonic()
 
             # 1) homepage links
             brand_pages = {}
-            html = await fetch_text(client, base, timeout=8.0)
+            html = await fetch_text(client, base, timeout=LEVEL_MAX_TIME.get(level, 12.0))
             if html:
                 soup = BeautifulSoup(html, 'lxml')
                 for a in soup.find_all('a', href=True):
@@ -287,7 +350,7 @@ async def discover_from_sources(max_per_source=80):
                 print(f"  {Fore.YELLOW}[-] {sname:<24} 0 brand pages{Style.RESET_ALL}")
                 continue
 
-            slugs = list(brand_pages.keys())[:max_per_source]
+            slugs = list(brand_pages.keys())[:cap]
             discovered = 0
             offers = 0
 
@@ -304,23 +367,8 @@ async def discover_from_sources(max_per_source=80):
                         merchant_url = res["final_url"]
 
                 # -- upsert Website (company entity) --
-                ws = db["websites"].find_one({"slug": slug})
-                if not ws:
-                    ws_id = db["websites"].insert_one({
-                        "name": bname, "slug": slug,
-                        "domain": canonical_domain(merchant_url),
-                        "status": "active",
-                        "settings": {"scan_frequency": 6, "crawl_depth": 1,
-                                     "javascript": False, "auto_publish": True, "ai_enabled": False},
-                        "stats": {"offers_found": 0, "offers_published": 0, "blocked_count": 0,
-                                  "success_rate": 0, "health_score": 100},
-                        "createdAt": now, "updatedAt": now,
-                    }).inserted_id
-                    discovered += 1
-                else:
-                    ws_id = ws["_id"]
-                    db["websites"].update_one({"_id": ws_id},
-                        {"$set": {"domain": canonical_domain(merchant_url), "updatedAt": now}})
+                ws_id = upsert_website(db, slug, bname, canonical_domain(merchant_url), level, now)
+                discovered += 1
 
                 # -- upsert Url (source brand page) grouped under the website --
                 url_doc = db["urls"].find_one({"url": page_url})
@@ -386,14 +434,22 @@ async def discover_from_sources(max_per_source=80):
                 db["websites"].update_one({"_id": ws_id},
                     {"$set": {"stats.last_scan": now, "stats.offers_found": offers}})
 
+            elapsed = time.monotonic() - started
+            prev_avg = src.get("avgScanTime") or elapsed
+            avg = round(0.7 * prev_avg + 0.3 * elapsed, 2)
+            level = classify_level(avg)
+            next_scan = now + timedelta(hours=LEVEL_INTERVALS[level])
             db["sources"].update_one({"_id": sid}, {"$set": {
+                "scanLevel": level,
+                "avgScanTime": avg,
+                "nextScanAt": next_scan,
                 "stats.brands_found": discovered,
                 "stats.offers_found": offers,
                 "stats.last_scan": now,
                 "stats.last_error": None}})
             total_brands += discovered
             total_offers += offers
-            print(f"  {Fore.GREEN}[+] {sname:<24} brands={discovered} offers={offers}{Style.RESET_ALL}")
+            print(f"  {Fore.GREEN}[+] {sname:<24} L{level} {avg:.1f}s brands={discovered} offers={offers} next={next_scan.strftime('%m-%d %H:%M')}{Style.RESET_ALL}")
 
     print(f"\n{Fore.CYAN}=== Done: {total_brands} brands, {total_offers} offers ==={Style.RESET_ALL}")
     close()
@@ -475,30 +531,41 @@ async def process_jobs():
                 print(f"  {Fore.RED}[-] {brand_name:<20} timeout{Style.RESET_ALL}")
 
 def reset_new_model():
-    """Purge bot-generated data while keeping sources (for model migration)."""
+    """Full reset: wipe ALL data (sources, users, offers, websites, urls) and drop
+    stale indexes left over from older models. Admin re-seeds on login."""
     db = connect()
-    now = datetime.now(timezone.utc)
+    for coll in ("websites", "urls", "offers", "brands"):
+        try:
+            db[coll].drop_indexes()
+        except Exception:
+            pass
     urls = db["urls"].delete_many({})
     websites = db["websites"].delete_many({})
     offers = db["offers"].delete_many({})
     brands = db["brands"].delete_many({})
     scanjobs = db["scanjobs"].delete_many({})
-    print(f"Purged urls={urls.deleted_count} websites={websites.deleted_count} "
-          f"offers={offers.deleted_count} brands={brands.deleted_count} scanjobs={scanjobs.deleted_count}")
+    sources = db["sources"].delete_many({})
+    users = db["users"].delete_many({})
+    logs = db["bot_logs"].delete_many({})
+    print(f"Full reset: urls={urls.deleted_count} websites={websites.deleted_count} "
+          f"offers={offers.deleted_count} brands={brands.deleted_count} "
+          f"sources={sources.deleted_count} users={users.deleted_count} "
+          f"scanjobs={scanjobs.deleted_count} logs={logs.deleted_count}")
     close()
 
 def main():
-    VERSION = "2.2.0"
+    VERSION = "2.3.0"
     p = argparse.ArgumentParser(description="Codexhange Offer Intelligence Platform")
     p.add_argument("--scan", action="store_true", help="Scan all active websites")
     p.add_argument("--sources", action="store_true", help="Discover brands + offers from crawl sources")
     p.add_argument("--max-per-source", type=int, default=80, help="Max brand pages per source")
+    p.add_argument("--force", action="store_true", help="Ignore scan-level schedules (scan everything now)")
     p.add_argument("--process-jobs", action="store_true", help="Process queued scan jobs")
     p.add_argument("--max", type=int, help="Max websites to scan")
     p.add_argument("--names", type=str, help="Filter by brand names (comma-separated)")
     p.add_argument("--stale", action="store_true", help="Scan websites not checked in 24h")
     p.add_argument("--purge-expired", action="store_true", help="Mark expired offers")
-    p.add_argument("--reset", action="store_true", help="Purge bot data (websites/urls/offers), keep sources")
+    p.add_argument("--reset", action="store_true", help="Full reset: wipe all data (sources, users, offers, websites, urls)")
     p.add_argument("--version", action="store_true", help="Show version")
     args = p.parse_args()
     if args.version: print(f"Codexhange Bot v{VERSION}"); return
@@ -506,7 +573,7 @@ def main():
     if args.purge_expired: purge_expired(); return
     if args.process_jobs: asyncio.run(process_jobs()); return
     if args.sources:
-        asyncio.run(discover_from_sources(max_per_source=args.max_per_source)); return
+        asyncio.run(discover_from_sources(max_per_source=args.max_per_source, force=args.force)); return
     if args.stale: asyncio.run(discover_all(stale_hours=24)); return
     if args.scan:
         names = [n.strip() for n in args.names.split(",")] if args.names else None

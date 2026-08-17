@@ -9,6 +9,9 @@ type Source = {
   url: string;
   type: string;
   frequency_hours: number;
+  scanLevel?: number;
+  avgScanTime?: number;
+  nextScanAt?: string;
   status: string;
   stats?: { brands_found: number; offers_found: number; last_scan?: string };
   createdAt?: string;
@@ -90,6 +93,17 @@ export default function SourcesPage() {
     load();
   };
 
+  const levelColor = (l?: number) => {
+    const m: Record<number, string> = { 1: '#22c55e', 2: '#f59e0b', 3: '#ef4444' };
+    return m[l || 2] || '#6b7280';
+  };
+  const nextScan = (s: Source) => {
+    if (!s.nextScanAt) return '—';
+    const d = new Date(s.nextScanAt);
+    const diff = Math.round((d.getTime() - Date.now()) / 3600000);
+    if (diff < 0) return 'due';
+    return `${diff}h`;
+  };
   const statusColor = (s: string) => {
     const m: Record<string, string> = { active: '#22c55e', paused: '#f59e0b', blocked: '#ef4444' };
     return m[s] || '#6b7280';
@@ -171,9 +185,11 @@ export default function SourcesPage() {
               <span className="flex-1">Name</span>
               <span className="w-16">Type</span>
               <span className="w-12">Freq</span>
+              <span className="w-12">Level</span>
               <span className="w-16">Status</span>
               <span className="w-16">Brands</span>
               <span className="w-16">Offers</span>
+              <span className="w-20">Next</span>
               <span className="w-24">Last scan</span>
               <span className="w-24 text-right">Actions</span>
             </div>
@@ -186,11 +202,16 @@ export default function SourcesPage() {
                   </div>
                   <span className="w-16 capitalize" style={{ color: 'var(--text-muted)' }}>{s.type || 'promo'}</span>
                   <span className="w-12" style={{ color: 'var(--text-muted)' }}>{s.frequency_hours}h</span>
+                  <span className="w-12 text-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                    style={{ backgroundColor: `${levelColor(s.scanLevel)}20`, color: levelColor(s.scanLevel) }}>
+                    L{s.scanLevel || 2}
+                  </span>
                   <button onClick={() => toggleStatus(s)} className="w-16 rounded-full text-center px-1.5 py-0.5 border" style={{ backgroundColor: `${statusColor(s.status)}20`, color: statusColor(s.status), borderColor: 'var(--border)' }}>
                     {s.status}
                   </button>
                   <span className="w-16 text-center" style={{ color: 'var(--text-muted)' }}>{s.stats?.brands_found || 0}</span>
                   <span className="w-16 text-center" style={{ color: 'var(--text-muted)' }}>{s.stats?.offers_found || 0}</span>
+                  <span className="w-20" style={{ color: 'var(--text-muted)' }}>{nextScan(s)}{s.avgScanTime ? ` · ${s.avgScanTime.toFixed(1)}s` : ''}</span>
                   <span className="w-24" style={{ color: 'var(--text-muted)' }}>{s.stats?.last_scan ? new Date(s.stats.last_scan).toLocaleDateString() : '—'}</span>
                   <span className="w-24 text-right">
                     <button onClick={() => remove(s)} className="text-[10px] hover:underline" style={{ color: '#ef4444' }}>Remove</button>

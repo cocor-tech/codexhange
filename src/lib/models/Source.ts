@@ -5,6 +5,9 @@ export interface ISource extends Document {
   url: string;
   type: 'promo' | 'deal' | 'cashback';
   frequency_hours: number;
+  scanLevel?: 1 | 2 | 3;
+  avgScanTime?: number;
+  nextScanAt?: Date;
   status: 'active' | 'paused' | 'blocked';
   stats: {
     brands_found: number;
@@ -23,6 +26,9 @@ const SourceSchema = new Schema<ISource>(
     url: { type: String, required: true, unique: true },
     type: { type: String, enum: ['promo', 'deal', 'cashback'], default: 'promo' },
     frequency_hours: { type: Number, default: 6 },
+    scanLevel: { type: Number, enum: [1, 2, 3], default: 2 },
+    avgScanTime: { type: Number, default: 0 },
+    nextScanAt: { type: Date },
     status: { type: String, enum: ['active', 'paused', 'blocked'], default: 'active' },
     stats: {
       brands_found: { type: Number, default: 0 },
