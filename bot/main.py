@@ -458,6 +458,8 @@ async def process_source(db, client, src, now, max_per_source=80):
             db.offers.delete_many({"websiteId": ws_id, "sourcePage": page_url,
                                    "sourceUrl": {"$ne": doc["sourceUrl"]}})
             offers += 1
+            tag = f"{Fore.GREEN}CODE{Style.RESET_ALL}" if code else f"{Fore.CYAN}DEAL{Style.RESET_ALL}"
+            print(f"    {tag} {bname} — {(result.get('title') or '')[:50]}")
 
         # -- crawl AI-detected promo/coupon links found on the brand page --
         for promo_url in result.get("promo_links", [])[:3]:

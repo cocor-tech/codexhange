@@ -163,6 +163,7 @@ export default async function BrandPage({ params }: Props) {
                     {o.description && <span className="ml-2 opacity-70">{o.description.slice(0, 100)}</span>}
                   </p>
                   <div className="flex items-center gap-3 mt-1.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    {o.store_name && <span>🏢 {o.store_name}</span>}
                     {o.updatedAt && <span>✓ Updated {timeAgo(new Date(o.updatedAt))}</span>}
                     {o.expiresAt && <span>⏱ Expires {new Date(o.expiresAt).toLocaleDateString()}</span>}
                     {o.code && o.code !== 'None' && <ShareButton code={o.code} brand={brand} brandSlug={slug} description={o.title} />}
