@@ -7,6 +7,8 @@ Configuration in MongoDB:
   db.ai_config.findOne() -> { provider, api_key, model, enabled }
 """
 
+import asyncio
+
 from app.services.ai_provider import get_provider, NullProvider
 
 def load_provider(db=None) -> object:
@@ -45,12 +47,10 @@ async def enrich_offer(title: str, description: str = "", provider=None) -> dict
     }
 
 async def enrich_batch(offers: list, provider=None) -> list:
-    results = []
-    for offer in offers:
-        result = await enrich_offer(
-            offer.get("title", ""),
-            offer.get("description", ""),
-            provider,
-        )
-        results.append({**offer, **result})
-    return results
+    if not offers:
+        return []
+    results = await asyncio.gather(*[
+        enrich_offer(o.get("title", ""), o.get("description", ""), provider)
+        for o in offers
+    ])
+    return [{**o, **r} for o, r in zip(offers, results)]
