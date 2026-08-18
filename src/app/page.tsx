@@ -142,9 +142,18 @@ export default async function HomePage() {
                 <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
                   {o.discount}{o.code ? <span className="ml-2 font-mono text-brand-500">{o.code}</span> : ''}
                 </p>
-                <p className="text-[10px] mt-2" style={{ color: 'var(--text-muted)' }}>
-                  {o.updatedAt ? `Updated ${timeAgo(new Date(o.updatedAt))}` : ''} · {o.store_name}
-                </p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    {o.updatedAt ? `Updated ${timeAgo(new Date(o.updatedAt))}` : ''} · {o.store_name}
+                  </p>
+                  {o.sourceUrl && (
+                    <a href={o.sourceUrl} target="_blank" rel="nofollow sponsored noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-brand-500/15 text-brand-500 hover:bg-brand-500/25">
+                      {o.code ? 'Use Code' : 'Get Deal'}
+                    </a>
+                  )}
+                </div>
               </Link>
             ))}
           </div>

@@ -178,6 +178,10 @@ export default async function BrandPage({ params }: Props) {
                       {o.code}
                     </code>
                     <CopyButton text={o.code} />
+                    <a href={o.sourceUrl || '#'} target="_blank" rel="nofollow sponsored noopener noreferrer"
+                      className="btn-primary px-3 py-1.5 text-xs whitespace-nowrap">
+                      Use Code
+                    </a>
                   </div>
                 ) : (
                   <a href={o.sourceUrl || '#'} target="_blank" rel="nofollow sponsored noopener noreferrer"
