@@ -12,7 +12,7 @@ const GH_WORKFLOW = 'bot-discovery.yml';
 export async function POST(req: NextRequest) {
   const authError = await requireAdmin(req);
   if (authError) return authError;
-  const { websiteId, url, source_type } = await req.json().catch(() => ({}));
+  const { websiteId, url, source_type, fullDiscovery } = await req.json().catch(() => ({}));
 
   const token = process.env.GH_PAT;
   if (!token) {
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     },
     body: JSON.stringify({
       ref: 'main',
-      inputs: { fullDiscovery: 'false' },
+      inputs: { fullDiscovery: fullDiscovery ? 'true' : 'false' },
     }),
   });
 
@@ -52,5 +52,9 @@ export async function POST(req: NextRequest) {
     }, { status: 500 });
   }
 
-  return NextResponse.json({ job, triggered: true }, { status: 201 });
+  return NextResponse.json({
+    job,
+    triggered: true,
+    runsUrl: `https://github.com/${GH_REPO}/actions`,
+  }, { status: 201 });
 }

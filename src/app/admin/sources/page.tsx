@@ -126,8 +126,10 @@ export default function SourcesPage() {
                       method: 'POST', headers: adminHeaders(),
                       body: JSON.stringify({ fullDiscovery: false }),
                     });
-                    const d = await res.json();
-                    msg(res.ok ? `✅ Bot run triggered: ${d.dispatchId || 'workflow started'}` : `❌ ${d.error || 'Failed'}`);
+                    const d = await res.json().catch(() => ({}));
+                    msg(res.ok
+                      ? `✅ Bot run triggered — view progress at ${d.runsUrl || 'GitHub Actions'}`
+                      : `❌ ${d.error || 'Failed'}`);
                   } catch { msg('❌ Network error'); }
                   setBusy(false);
                 }}

@@ -152,6 +152,23 @@ export default function AdminPage() {
     setEmail(''); setPassword(''); setOtp(''); setOtpRequired(false);
   };
 
+  const startBot = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await window.fetch('/api/admin/scan-jobs/trigger', {
+        method: 'POST', headers: adminHeaders(),
+        body: JSON.stringify({ fullDiscovery: true }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok) msg(`✅ Bot run triggered — view progress at ${d.runsUrl || 'GitHub Actions'}`);
+      else msg(`❌ ${d.error || 'Failed to trigger bot'}`);
+    } catch {
+      msg('❌ Network error — check the bot API is reachable');
+    }
+    setBusy(false);
+  };
+
   if (session.loading) {
     return <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-bg-base)' }}>
       <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading…</p>
@@ -261,6 +278,11 @@ export default function AdminPage() {
               <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Crawl active sources for new brands + codes</p>
             </div>
             <div className="flex gap-2">
+              {actionMsg && (
+                <div className="text-xs flex items-center" style={{ color: actionMsg.startsWith('✅') ? '#22c55e' : '#ef4444' }}>
+                  {actionMsg}
+                </div>
+              )}
               <button
                 onClick={async () => {
                   if (!window.confirm('PURGE all brands, brand websites and their offers? (Sources are kept. This cannot be undone.)')) return;
@@ -276,15 +298,11 @@ export default function AdminPage() {
                 className="btn-glass px-4 py-2 text-xs"
                 style={{ color: '#ef4444', borderColor: '#ef4444' }}
               >Purge Old Brands</button>
-              <button onClick={async () => {
-                const btn = document.activeElement as HTMLButtonElement;
-                if (btn) { btn.textContent = 'Running...'; btn.disabled = true; }
-                await window.fetch('/api/admin/scan-progress', {
-                  method: 'POST', headers: adminHeaders(),
-                  body: JSON.stringify({ action: 'start' })
-                });
-                setTimeout(() => { window.location.reload(); }, 2000);
-              }} className="btn-primary px-4 py-2 text-xs">▶ Start Scan</button>
+              <button
+                onClick={startBot}
+                disabled={busy}
+                className="btn-primary px-4 py-2 text-xs"
+              >{busy ? 'Starting…' : '▶ Start Bot'}</button>
             </div>
           </div>
 
