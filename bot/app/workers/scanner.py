@@ -22,6 +22,7 @@ OUTBOUND_SKIP_DOMAINS = {
 }
 OUTBOUND_SKIP_PATH_RE = re.compile(r"/share|/intent|/sharer|/login|/signin|consent\.", re.I)
 OUTBOUND_DEAL_TEXT = re.compile(r"code|coupon|deal|save|shop|offer|promo|get|reveal|voucher|buy|order|checkout", re.I)
+SKIP_MERCHANT_LINKS = {"facebook.com", "x.com", "twitter.com", "instagram.com", "linkedin.com", "youtube.com"}
 
 # Page titles that indicate a soft-404 (HTTP 200 with a "not found" template)
 SOFT_404_TITLE_KW = [
@@ -162,7 +163,114 @@ async def scan_source(client, url: str, brand_name: str = "", db=None) -> dict:
         except Exception:
             pass
 
+        # -- extract the actual merchant website URL from aggregator pages --
+        merchant_url = ""
+        if not outbound:
+            try:
+                merchant_url = _extract_merchant_url(soup, url, brand_name)
+            except Exception:
+                pass
+        result["merchant_url"] = merchant_url
+
     except Exception as e:
         result["error"] = str(e)[:200]
 
     return result
+
+
+MERCHANT_URL_RE = re.compile(
+    r'(?:(?:https?://)?(?:www\.)?([a-z0-9][a-z0-9\-]{1,63}\.(?:com|net|org|co\.uk|ca|au|us|io|co)))',
+    re.I,
+)
+WEBSITE_TEXT_RE = re.compile(
+    r'(?:official\s+site|visit\s+site|go\s+to\s+site|shop\s+now\s+at|on\s+\w+\s+website|website)',
+    re.I,
+)
+
+
+def _extract_merchant_url(soup, page_url: str, brand_name: str) -> str:
+    """Try to find the actual merchant URL on an aggregator coupon page.
+
+    Looks for: sidebar "Website" links, "on {Brand} Website" patterns,
+    JSON-LD merchant URLs, meta tags.
+    """
+    from urllib.parse import urlparse as _p
+    page_host = _p(page_url).netloc.lower().replace("www.", "")
+
+    # 1. JSON-LD / structured data with merchant URL
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            import json
+            data = json.loads(script.string or "")
+            if not isinstance(data, dict):
+                continue
+            dtype = (data.get("@type") or "").lower()
+            # WebPage sameAs often links to the real merchant (skip Organization, BreadcrumbList etc.)
+            if dtype in ("webpage", "onlinestore", "product"):
+                same_as = data.get("sameAs") or []
+                if isinstance(same_as, str):
+                    same_as = [same_as]
+                for u in same_as:
+                    if not u.startswith("http"):
+                        continue
+                    h = u.split("//")[-1].split("/")[0].lower().replace("www.", "")
+                    if h != page_host and h not in SKIP_MERCHANT_LINKS:
+                        return u
+        except Exception:
+            pass
+
+    # 2. Sidebar "Website" link — aggregator pages often have a sidebar
+    #    with <a href="https://brand.com">Website</a>
+    brand_lower = brand_name.lower().replace(" ", "")
+    for a in soup.find_all("a", href=True):
+        try:
+            href = a["href"].strip()
+            text = a.get_text(strip=True).lower()
+            if not href.startswith("http"):
+                continue
+            h = _p(href).netloc.lower().replace("www.", "")
+            if h == page_host:
+                continue
+            if text in ("website", "official site", "visit site", "shop now"):
+                return href
+            if brand_lower in h.replace("-", "").replace(".", "") and text in ("website", "official site", f"{brand_name.lower()} website"):
+                return href
+        except Exception:
+            continue
+
+    # 3. "on {Brand} Website" text pattern → look for links near that text
+    page_text = soup.get_text(" ", strip=True)
+    pattern = re.compile(
+        rf'(?:on|at|visit)\s+{re.escape(brand_name)}\s+website',
+        re.I,
+    )
+    if pattern.search(page_text):
+        # find all outbound links and prefer the brand's own domain
+        for a in soup.find_all("a", href=True):
+            try:
+                href = a["href"].strip()
+                if not href.startswith("http"):
+                    continue
+                h = _p(href).netloc.lower().replace("www.", "")
+                if h == page_host:
+                    continue
+                if brand_lower in h.replace("-", "").replace(".", ""):
+                    return href
+            except Exception:
+                continue
+
+    # 4. Brute-force: find a link whose domain matches the brand name
+    for a in soup.find_all("a", href=True):
+        try:
+            href = a["href"].strip()
+            if not href.startswith("http"):
+                continue
+            h = _p(href).netloc.lower().replace("www.", "")
+            if h == page_host:
+                continue
+            if brand_lower in h.replace("-", "").replace(".", ""):
+                return href
+        except Exception:
+            continue
+
+    return ""

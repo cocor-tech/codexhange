@@ -428,11 +428,11 @@ async def process_source(db, client, src, now, max_per_source=80):
         outbound = result.get("outbound_links") or []
         # A page is a "code" page when a code was extracted, otherwise a
         # "link/deal" page when it points at a merchant (Shop Now / Get Deal).
-        if result.get("success") and (codes or outbound):
+        has_merchant = bool(result.get("merchant_url"))
+        if result.get("success") and (codes or outbound or has_merchant):
             code = codes[0] if codes else None
-            # Prefer the resolved merchant URL from a "Shop Now"/"Get Code"
-            # button over the aggregator brand page itself.
-            dest = merchant_url
+            # Prefer outbound merchant links > extracted merchant URL > aggregator page
+            dest = result.get("merchant_url") or merchant_url
             if outbound:
                 dest = outbound[0]["url"]
             deal = Deal(
@@ -490,7 +490,7 @@ async def process_source(db, client, src, now, max_per_source=80):
             poutbound = pres.get("outbound_links") or []
             if pcodes or poutbound:
                 pcode = pcodes[0] if pcodes else None
-                pdest = full
+                pdest = pres.get("merchant_url") or full
                 if poutbound:
                     pdest = poutbound[0]["url"]
                 pdeal = Deal(
