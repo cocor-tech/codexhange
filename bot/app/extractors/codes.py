@@ -23,7 +23,7 @@ def validate_code(raw: Optional[str]) -> Optional[str]:
     if " " in cleaned: return None
     if not re.match(r'^[A-Z0-9_\-+]+$', cleaned): return None
     if cleaned in SKIP_CODES: return None
-    if re.match(r'^\d{2,4}$', cleaned): return None
+    if re.match(r'^\d+$', cleaned): return None
     return cleaned
 
 def infer_code_from_url(url: str, brand_name: str = "") -> Optional[str]:
@@ -82,15 +82,31 @@ def extract_codes_from_soup(soup: BeautifulSoup, url: str = "", brand_name: str 
                 c2 = validate_code(el.get(attr, ""))
                 if c2: codes.add(c2)
 
-    # Pattern 6: Near "Copy" buttons
+    # Pattern 6: Near "Copy" buttons — only when the surrounding container has
+    # code-ish context, and never grab the button's own words.
     for btn in soup.find_all(["button", "a", "span"]):
         btn_text = btn.get_text(strip=True).lower()
-        if any(kw in btn_text for kw in ["copy", "copy code", "copy coupon"]):
-            parent = btn.parent
-            if parent:
-                for m in re.finditer(r'\b([A-Z0-9_\-]{4,20})\b', parent.get_text(strip=True).upper()):
-                    c = validate_code(m.group(1))
-                    if c: codes.add(c)
+        if "copyright" in btn_text:
+            continue
+        if not any(kw in btn_text for kw in ["copy code", "copy coupon", "copy"]):
+            continue
+        container = btn.parent
+        candidates = [container]
+        if container and len(container.get_text(" ", strip=True)) < 60 and container.parent:
+            candidates.append(container.parent)
+        for parent in candidates:
+            if not parent:
+                continue
+            txt = parent.get_text(" ", strip=True)
+            if 200 < len(txt) or len(txt) < 8:
+                continue
+            if not re.search(r'(code|coupon|promo|voucher|%|off|save|deal)', txt, re.I):
+                continue
+            btn_tokens = set(btn.get_text(strip=True).upper().split())
+            for m in re.finditer(r'\b([A-Z0-9_\-]{4,20})\b', txt.upper()):
+                c = validate_code(m.group(1))
+                if c and m.group(1) not in btn_tokens:
+                    codes.add(c)
 
     # Pattern 7: JSON-LD
     for script in soup.find_all("script", type="application/ld+json"):
