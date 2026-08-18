@@ -2,7 +2,8 @@
 Scan a single source URL and return extracted deals.
 Used both by the batch pipeline and the admin Deal Scanner.
 """
-from urllib.parse import urljoin
+import re
+from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 from app.services.fetcher import smart_fetch, fetch_direct, is_cloudflare
 from app.extractors import extract_codes_from_soup, detect_countries, extract_discount_value, extract_expiry
@@ -10,6 +11,17 @@ from app.extractors.codes import validate_code
 from app.services.classifier import classify
 from app.services.ai_provider import get_provider
 from app.services.resolver import extract_outbound_links, resolve_final_url, is_redirect_domain
+
+# Social-share / login / consent endpoints are redirect links too, but they
+# never lead to a merchant checkout — exclude them from deal resolution.
+OUTBOUND_SKIP_DOMAINS = {
+    "twitter.com", "x.com", "facebook.com", "m.facebook.com", "linkedin.com",
+    "youtube.com", "m.youtube.com", "instagram.com", "reddit.com",
+    "pinterest.com", "whatsapp.com", "wa.me", "t.me", "telegram.me",
+    "consent.google.com", "consent.youtube.com", "accounts.google.com",
+}
+OUTBOUND_SKIP_PATH_RE = re.compile(r"/share|/intent|/sharer|/login|/signin|consent\.", re.I)
+OUTBOUND_DEAL_TEXT = re.compile(r"code|coupon|deal|save|shop|offer|promo|get|reveal|voucher|buy|order|checkout", re.I)
 
 async def scan_source(client, url: str, brand_name: str = "", db=None) -> dict:
     url = url.strip().rstrip("/")
@@ -96,6 +108,17 @@ async def scan_source(client, url: str, brand_name: str = "", db=None) -> dict:
             outbound = []
             for l in extract_outbound_links(url, soup):
                 if not l["is_redirect"]:
+                    continue
+                try:
+                    host = urlparse(l["url"]).netloc.lower().replace("www.", "")
+                    skip = host in OUTBOUND_SKIP_DOMAINS or \
+                        any(host == d or host.endswith("." + d) for d in OUTBOUND_SKIP_DOMAINS) or \
+                        OUTBOUND_SKIP_PATH_RE.search(l["url"])
+                    if skip:
+                        continue
+                    if not OUTBOUND_DEAL_TEXT.search(l["text"]):
+                        continue
+                except Exception:
                     continue
                 res = await resolve_final_url(client, l["url"])
                 if res["ok"] and res["domain"] and not is_redirect_domain(res["domain"]):
