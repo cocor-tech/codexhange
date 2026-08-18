@@ -510,6 +510,29 @@ async def discover_from_sources(max_per_source=80, force=False):
             print(f"  {Fore.GREEN}[+] {sname:<24} L{level} {avg:.1f}s brands={discovered} offers={offers} next={next_scan.strftime('%m-%d %H:%M')}{Style.RESET_ALL}")
 
     print(f"\n{Fore.CYAN}=== Done: {total_brands} brands, {total_offers} offers ==={Style.RESET_ALL}")
+
+    # -- AI enrichment + cross-source comparison (only when AI is configured) --
+    try:
+        provider = load_provider(db)
+        if not isinstance(provider, NullProvider):
+            from app.workers.comparer import compare_all_brands
+            print(f"\n{Fore.CYAN}=== AI cross-source comparison ==={Style.RESET_ALL}")
+            to_enrich = list(db.offers.find({"strategy": "source_discovery",
+                                             "enriched": {"$ne": True}}).limit(150))
+            if to_enrich:
+                enriched = await enrich_batch(to_enrich, provider)
+                for e in enriched:
+                    db.offers.update_one({"_id": e["_id"]}, {"$set": {
+                        "title": e.get("title"), "deal_type": e.get("deal_type"),
+                        "tags": e.get("tags", []), "enriched": True,
+                    }})
+                print(f"  Enriched {len(enriched)} offers")
+            stats = await compare_all_brands(db, provider)
+            print(f"  Compared {stats['brands']} brands / {stats['offers']} offers, "
+                  f"archived {stats['archived']} duplicates")
+    except Exception as e:
+        print(f"  {Fore.YELLOW}[!] AI compare skipped: {e}{Style.RESET_ALL}")
+
     close()
 
 def purge_expired():
@@ -611,7 +634,7 @@ def reset_new_model():
     close()
 
 def main():
-    VERSION = "2.3.0"
+    VERSION = "2.4.0"
     p = argparse.ArgumentParser(description="Codexhange Offer Intelligence Platform")
     p.add_argument("--scan", action="store_true", help="Scan all active websites")
     p.add_argument("--sources", action="store_true", help="Discover brands + offers from crawl sources")
@@ -621,6 +644,8 @@ def main():
     p.add_argument("--max", type=int, help="Max websites to scan")
     p.add_argument("--names", type=str, help="Filter by brand names (comma-separated)")
     p.add_argument("--stale", action="store_true", help="Scan websites not checked in 24h")
+    p.add_argument("--compare", action="store_true", help="AI cross-source compare: score + dedupe offers per brand")
+    p.add_argument("--seed-sources", type=str, metavar="FILE", help="Seed sources collection from a JSON file [{name,url,type,frequency_hours,status}]")
     p.add_argument("--purge-expired", action="store_true", help="Mark expired offers")
     p.add_argument("--reset", action="store_true", help="Full reset: wipe all data (sources, users, offers, websites, urls)")
     p.add_argument("--version", action="store_true", help="Show version")
@@ -629,6 +654,45 @@ def main():
     if args.reset: reset_new_model(); return
     if args.purge_expired: purge_expired(); return
     if args.process_jobs: asyncio.run(process_jobs()); return
+    if args.seed_sources:
+        import json as _json
+        db = connect()
+        with open(args.seed_sources) as f:
+            data = _json.load(f)
+        items = data.get("batch", data) if isinstance(data, dict) else data
+        created = skipped = 0
+        for s in items:
+            u = (s.get("url") or "").strip()
+            if not u:
+                continue
+            if db["sources"].find_one({"url": u}):
+                skipped += 1
+                continue
+            db["sources"].insert_one({
+                "name": (s.get("name") or u.replace("https://", "").replace("http://", "").replace("www.", "")).strip(),
+                "url": u,
+                "type": s.get("type") or "promo",
+                "frequency_hours": s.get("frequency_hours") or 6,
+                "status": s.get("status") or "active",
+                "createdAt": datetime.now(timezone.utc),
+                "updatedAt": datetime.now(timezone.utc),
+            })
+            created += 1
+        print(f"Seeded {created} sources ({skipped} already present)")
+        close(); return
+    if args.compare:
+        from app.workers.comparer import compare_all_brands
+        db = connect()
+        provider = load_provider(db)
+        if isinstance(provider, NullProvider):
+            print(f"{Fore.YELLOW}No AI provider configured (ai_config in DB or AI_* env vars) — "
+                  f"running heuristic compare only.{Style.RESET_ALL}")
+        async def _run():
+            stats = await compare_all_brands(db, provider)
+            print(f"Compared {stats['brands']} brands / {stats['offers']} offers, "
+                  f"archived {stats['archived']} duplicates")
+            close()
+        asyncio.run(_run()); return
     if args.sources:
         asyncio.run(discover_from_sources(max_per_source=args.max_per_source, force=args.force)); return
     if args.stale: asyncio.run(discover_all(stale_hours=24)); return
