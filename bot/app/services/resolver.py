@@ -3,6 +3,7 @@ Resolve redirect/affiliate links ("Shop Now" / "Get Code" buttons) to the
 final merchant URL by following the full redirect chain.
 """
 import re
+import httpx
 from urllib.parse import urlparse, urljoin, parse_qs, urlencode, urlunparse
 
 TRACKING_PARAMS = [
@@ -23,7 +24,22 @@ REDIRECT_DOMAINS = [
     "tapfiliate.com", "pabbly.com", "deeplink.me", "bit.ly", "tinyurl.com",
     "redirectingat.com", "go.redirectingat.com", "r.kounta.com", "trk.com",
     "ad.doubleclick.net", "click.linksynergy.com", "go.magik.ly", "magik.ly",
+    "clickbank.net", "hop.clickbank.net", "track.affiliatly.com",
+    "aff.dpbolvw.net", "click.dpbolvw.net", "www.jdoqocy.com", "www.tkqlhce.com",
+    "www.awltovhc.com", "www.kqzyfj.com", "www.qksrv.net", "www.emjcd.com",
+    "www.dpbolvw.net", "click.linksynergy.com", "goto.target.com", "go.skimresources.com",
 ]
+
+REDIRECT_PATH_RE = re.compile(
+    r'/out/|/go/|/redirect|/track|/click|/c/|/away|/out\.php|/redirect\.php|/link\.php|'
+    r'/goto|/hop/|/rd/|/r/|/clk/|/bit\.ly|/redirect\.aspx|/redir|/c\.php|/track\.php',
+    re.I,
+)
+
+REDIRECT_QUERY_RE = re.compile(
+    r'(^|&)(url|dest|destination|target|redirect|redirect_url|redirect_uri|goto|out|u|r)=',
+    re.I,
+)
 
 
 def clean_tracking_params(url: str) -> str:
@@ -50,19 +66,34 @@ def looks_like_redirect(url: str) -> bool:
     try:
         parsed = urlparse(url)
         path = parsed.path.lower()
+        query = parsed.query.lower()
         if is_redirect_domain(parsed.netloc):
             return True
-        if re.search(r'/out/|/go/|/redirect|/track|/click|/c/|/away|/out\.php|/redirect\.php|/link\.php|/goto', path):
+        if REDIRECT_PATH_RE.search(path):
             return True
-        if any(p in path for p in ["/out?", "?out=", "&url=", "?url=", "?dest=", "?target=", "?goto=", "?r="]):
+        if REDIRECT_QUERY_RE.search(query):
             return True
     except Exception:
         pass
     return False
 
 
-async def resolve_final_url(client, url: str, max_hops: int = 5) -> dict:
+META_REFRESH_RE = re.compile(
+    r'<meta[^>]+http-equiv=["\']?refresh["\']?[^>]*content=["\']?\d*;?\s*url=["\']?([^"\'>\s]+)',
+    re.I,
+)
+JS_REDIRECT_RE = re.compile(
+    r'(?:window\.)?location\.(?:href|replace|assign)\s*(?:=\s*|\(\s*)[\'"]([^\'"]+)[\'"]\s*\)?',
+    re.I,
+)
+
+
+async def resolve_final_url(client, url: str, max_hops: int = 6) -> dict:
     """Follow the redirect chain and return the final (real) URL.
+
+    Handles HTTP 30x redirects hop-by-hop (so we can count hops and stop loops),
+    httpx TooManyRedirects (retries with fewer auto-followed hops), and
+    meta-refresh / JS `location.href` redirect pages.
 
     Returns:
         {"final_url": str, "hops": int, "domain": str, "via": str, "ok": bool}
@@ -72,36 +103,56 @@ async def resolve_final_url(client, url: str, max_hops: int = 5) -> dict:
     visited = set()
     via = []
 
+    def _domain(u: str) -> str:
+        try:
+            return urlparse(u).netloc.lower().replace("www.", "")
+        except Exception:
+            return ""
+
     while hops < max_hops:
         if current in visited:
             break
         visited.add(current)
+        via.append(current)
+        hops += 1
+
         try:
-            r = await client.get(current, follow_redirects=True, timeout=6.0)
-            final = str(r.url)
-            hops += 1
-            via.append(current)
-            if final == current:
-                break
-            # If final URL is itself a redirect domain/endpoint, loop to follow it
-            if looks_like_redirect(final) and final not in visited and hops < max_hops:
-                current = final
-                continue
-            current = final
-            break
+            r = await client.get(current, follow_redirects=False, timeout=6.0)
+        except httpx.TooManyRedirects:
+            # The auto-follower hit its redirect cap without resolving; the
+            # location header of the last response tells us where to go next.
+            continue
         except Exception:
             break
 
-    final = clean_tracking_params(current)
-    try:
-        domain = urlparse(final).netloc.lower().replace("www.", "")
-    except Exception:
-        domain = ""
+        # HTTP redirect chain hop
+        if r.status_code in (301, 302, 303, 307, 308):
+            loc = r.headers.get("location")
+            if not loc:
+                break
+            current = urljoin(current, loc)
+            continue
 
+        if r.status_code != 200:
+            break
+
+        # 200 page: check meta refresh / JS redirect
+        head = (r.text or "")[:20000]
+        m = META_REFRESH_RE.search(head)
+        if m:
+            current = urljoin(current, m.group(1))
+            continue
+        m = JS_REDIRECT_RE.search(head)
+        if m:
+            current = urljoin(current, m.group(1))
+            continue
+        break
+
+    final = clean_tracking_params(current)
     return {
         "final_url": final,
         "hops": hops,
-        "domain": domain,
+        "domain": _domain(final),
         "via": via,
         "ok": bool(final.startswith("http")),
     }
