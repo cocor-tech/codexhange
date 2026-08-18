@@ -347,6 +347,7 @@ async def discover_from_sources(max_per_source=80, force=False):
             if not brand_pages:
                 db["sources"].update_one({"_id": sid}, {"$set": {
                     "stats.last_scan": now, "stats.last_error": "no brand pages found"}})
+                write_log(db, sname, "found_none", error="no brand pages found")
                 print(f"  {Fore.YELLOW}[-] {sname:<24} 0 brand pages{Style.RESET_ALL}")
                 continue
 
@@ -507,6 +508,7 @@ async def discover_from_sources(max_per_source=80, force=False):
                 "stats.last_error": None}})
             total_brands += discovered
             total_offers += offers
+            write_log(db, sname, "success", found=discovered, submitted=offers)
             print(f"  {Fore.GREEN}[+] {sname:<24} L{level} {avg:.1f}s brands={discovered} offers={offers} next={next_scan.strftime('%m-%d %H:%M')}{Style.RESET_ALL}")
 
     print(f"\n{Fore.CYAN}=== Done: {total_brands} brands, {total_offers} offers ==={Style.RESET_ALL}")
@@ -517,6 +519,7 @@ async def discover_from_sources(max_per_source=80, force=False):
         print(f"\n{Fore.CYAN}=== Re-verifying offers from {len(due)} crawled sources ==={Style.RESET_ALL}")
         vstats = await reverify_all(db, client, sources=due)
         print(f"  Checked {vstats['checked']} offers, expired {vstats['expired']} dead codes")
+        write_log(db, "reverify", "success", found=vstats["checked"], submitted=vstats["expired"])
     except Exception as e:
         print(f"  {Fore.YELLOW}[!] Re-verify skipped: {e}{Style.RESET_ALL}")
 
@@ -539,6 +542,7 @@ async def discover_from_sources(max_per_source=80, force=False):
             stats = await compare_all_brands(db, provider)
             print(f"  Compared {stats['brands']} brands / {stats['offers']} offers, "
                   f"archived {stats['archived']} duplicates")
+            write_log(db, "compare", "success", found=stats["brands"], submitted=stats["archived"])
     except Exception as e:
         print(f"  {Fore.YELLOW}[!] AI compare skipped: {e}{Style.RESET_ALL}")
 
@@ -711,6 +715,7 @@ def main():
                 stats = await reverify_all(db, client)
                 print(f"Checked {stats['checked']} offers across {stats['sources']} sources, "
                       f"expired {stats['expired']} dead codes")
+                write_log(db, "reverify", "success", found=stats["checked"], submitted=stats["expired"])
             close()
         asyncio.run(_run()); return
     if args.sources:
