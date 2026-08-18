@@ -12,7 +12,6 @@ def extract_expiry(text: str) -> Optional[datetime]:
     patterns = [
         r"(?:expires?|ends?|valid\s+(?:until?|till?|through?))\s+" + MONTHS + r"\s+(\d{1,2})(?:,?\s*(\d{4}))?",
         r"(?:expires?|ends?|valid\s+(?:until?|till?|through?))\s+(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?",
-        r"(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})",
         r"(?:expires?|ends?)\s+in\s+(\d+)\s+days?",
         r"(?:valid\s+for|for)\s+(\d+)\s+days?",
     ]
@@ -34,7 +33,7 @@ def extract_expiry(text: str) -> Optional[datetime]:
                 try: return datetime(*d, tzinfo=timezone.utc)
                 except: pass
 
-    m = re.search(patterns[3], t, re.I) or re.search(patterns[4], t, re.I)
+    m = re.search(patterns[2], t, re.I) or re.search(patterns[3], t, re.I)
     if m:
         days = int(m.group(1))
         if days <= 365: return now + timedelta(days=days)
