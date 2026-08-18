@@ -45,6 +45,8 @@ export interface IOffer extends Document {
   clicks: number;
   upvotes: number;
   downvotes: number;
+  avgRating?: number;
+  ratingCount?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -84,6 +86,8 @@ const OfferSchema = new Schema<IOffer>(
     clicks: { type: Number, default: 0 },
     upvotes: { type: Number, default: 0 },
     downvotes: { type: Number, default: 0 },
+    avgRating: { type: Number, default: 0 },
+    ratingCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

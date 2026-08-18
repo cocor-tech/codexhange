@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import { getCategory, getDidYouMean, CATEGORY_BRANDS, BRAND_CATEGORIES } from '@/lib/brands';
 import { ShareButton } from '@/components/codes/ShareButton';
 import { OfferVoteButtons } from '@/components/offers/VoteButtons';
+import { OfferRateStars } from '@/components/offers/RateStars';
 import { CopyButton } from '@/components/offers/CopyButton';
 
 interface Props {
@@ -166,6 +167,7 @@ export default async function BrandPage({ params }: Props) {
                     {o.expiresAt && <span>⏱ Expires {new Date(o.expiresAt).toLocaleDateString()}</span>}
                     {o.code && o.code !== 'None' && <ShareButton code={o.code} brand={brand} brandSlug={slug} description={o.title} />}
                     <OfferVoteButtons offerId={o._id.toString()} upvotes={o.upvotes || 0} downvotes={o.downvotes || 0} />
+                    <OfferRateStars offerId={o._id.toString()} avgRating={o.avgRating || 0} ratingCount={o.ratingCount || 0} />
                   </div>
                 </div>
                 {o.code && o.code !== 'None' ? (
