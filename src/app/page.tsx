@@ -126,9 +126,11 @@ export default async function HomePage() {
             Trending Offers
           </h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {trending.map((o: any) => (
-              <Link key={o._id.toString()} href={`/brand/${(o.store_slug || o.store_name || '').toLowerCase().replace(/ /g, '-')}`}
-                className="glass-card p-4 hover:scale-[1.02] transition-transform">
+            {trending.map((o: any) => {
+              const brandSlug = (o.store_slug || o.store_name || '').toLowerCase().replace(/ /g, '-');
+              return (
+              <div key={o._id.toString()} className="glass-card p-4 hover:scale-[1.02] transition-transform">
+                <a href={`/brand/${brandSlug}`} className="block">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
                     {o.title || o.store_name}
@@ -142,20 +144,20 @@ export default async function HomePage() {
                 <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
                   {o.discount}{o.code ? <span className="ml-2 font-mono text-brand-500">{o.code}</span> : ''}
                 </p>
+                </a>
                 <div className="flex items-center justify-between mt-2">
                   <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                     {o.updatedAt ? `Updated ${timeAgo(new Date(o.updatedAt))}` : ''} · {o.store_name}
                   </p>
                   {o.sourceUrl && (
                     <a href={o.sourceUrl} target="_blank" rel="nofollow sponsored noopener noreferrer"
-                      onClick={e => e.stopPropagation()}
                       className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-brand-500/15 text-brand-500 hover:bg-brand-500/25">
                       {o.code ? 'Use Code' : 'Get Deal'}
                     </a>
                   )}
                 </div>
-              </Link>
-            ))}
+              </div>
+            )})}
           </div>
         </section>
       )}
