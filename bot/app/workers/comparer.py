@@ -110,6 +110,31 @@ async def compare_offers_for_brand(db, provider, store_name: str, limit: int = 6
     if not offers:
         return {"store_name": store_name, "offers": 0, "groups": 0, "archived": 0}
 
+    # -- rescore EVERY offer with the weighted ranking model --
+    from app.services.ranking import rank_offer, corroboration_count
+    sources = {}
+    try:
+        for src in db["sources"].find({}):
+            base = (src.get("url") or "").rstrip("/")
+            if base:
+                sources[base] = src
+    except Exception:
+        pass
+    ranked = 0
+    for o in offers:
+        count = corroboration_count(offers, o.get("code") or "")
+        source = None
+        for base, src in sources.items():
+            if (o.get("sourcePage") or "").startswith(base):
+                source = src
+                break
+        new_conf = rank_offer(o, count, source, now)
+        if new_conf != (o.get("confidence") or 0):
+            db.offers.update_one({"_id": o["_id"]}, {
+                "$set": {"confidence": new_conf, "corroborationCount": count, "rankedAt": now}})
+        o["confidence"] = new_conf
+        ranked += 1
+
     groups = {}
     for o in offers:
         key = normalize_code(o.get("code"))
@@ -177,6 +202,7 @@ async def compare_offers_for_brand(db, provider, store_name: str, limit: int = 6
         "offers": len(offers),
         "groups": len(groups),
         "archived": archived,
+        "ranked": ranked,
     }
 
 
