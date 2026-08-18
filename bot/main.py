@@ -14,7 +14,7 @@ from client import create_shared_client
 from app.config import settings
 from app.models.deal import Deal
 from app.adapters import HomepageAdapter, CrawlerAdapter, LinkDiscoveryAdapter
-from app.publishers.mongo import build_document
+from app.publishers.mongo import build_document, upsert_offer
 from app.workers.enricher import load_provider, enrich_batch, NullProvider
 from app.workers.scanner import scan_source
 
@@ -175,7 +175,7 @@ async def process_website(db, site, client):
         doc = build_document(deal, wid, site)
         doc["store_name"] = brand_name
         doc["websiteId"] = wid
-        db.offers.insert_one(doc)
+        upsert_offer(db, doc, wid, doc["sourceUrl"])
         submitted += 1
 
     if submitted > 0:
@@ -407,12 +407,18 @@ async def discover_from_sources(max_per_source=80, force=False):
                     continue
                 if result.get("success") and result.get("codes"):
                     code = result["codes"][0] if result["codes"] else None
+                    # Prefer the resolved merchant URL from a "Shop Now"/"Get Code"
+                    # button over the aggregator brand page itself.
+                    dest = merchant_url
+                    outbound = result.get("outbound_links") or []
+                    if outbound:
+                        dest = outbound[0]["final_url"]
                     deal = Deal(
                         store_name=bname,
                         deal_type=result.get("deal_type", "sale"),
                         code=code,
                         title=str(result.get("title") or f"{bname} offer")[:200],
-                        destination_url=merchant_url,
+                        destination_url=dest,
                         source_page=page_url,
                         confidence_score=85 if code else 60,
                         strategy="source_discovery",
@@ -425,8 +431,10 @@ async def discover_from_sources(max_per_source=80, force=False):
                     doc["urlId"] = url_id
                     if resolved_id:
                         doc["resolvedUrlId"] = resolved_id
-                    db.offers.delete_many({"websiteId": ws_id, "sourceUrl": page_url, "status": {"$ne": "published"}})
-                    db.offers.insert_one(doc)
+                    upsert_offer(db, doc, ws_id, doc["sourceUrl"])
+                    # Drop stale offers for this page when the merchant URL changed
+                    db.offers.delete_many({"websiteId": ws_id, "sourcePage": page_url,
+                                           "sourceUrl": {"$ne": doc["sourceUrl"]}})
                     offers += 1
 
                 # -- crawl AI-detected promo/coupon links found on the brand page --
@@ -472,8 +480,9 @@ async def discover_from_sources(max_per_source=80, force=False):
                         pdoc_b["store_name"] = bname
                         pdoc_b["websiteId"] = ws_id
                         pdoc_b["urlId"] = p_url_id
-                        db.offers.delete_many({"websiteId": ws_id, "sourceUrl": full, "status": {"$ne": "published"}})
-                        db.offers.insert_one(pdoc_b)
+                        upsert_offer(db, pdoc_b, ws_id, pdoc_b["sourceUrl"])
+                        db.offers.delete_many({"websiteId": ws_id, "sourcePage": full,
+                                               "sourceUrl": {"$ne": pdoc_b["sourceUrl"]}})
                         offers += 1
                     db["urls"].update_one({"_id": p_url_id},
                         {"$set": {"stats.last_scan": now, "stats.offers_found": 1 if pres.get("codes") else 0}})
@@ -566,8 +575,7 @@ async def process_jobs():
                     doc = build_document(deal, site["_id"], site)
                     doc["store_name"] = brand_name
                     doc["websiteId"] = site["_id"]
-                    db.offers.delete_many({"websiteId": site["_id"], "sourceUrl": url, "status": {"$ne": "published"}})
-                    db.offers.insert_one(doc)
+                    upsert_offer(db, doc, site["_id"], doc["sourceUrl"])
                     scanjobs.update_one({"_id": job["_id"]}, {"$set": {"status": "completed", "offers_found": len(result["codes"]), "finished_at": datetime.now(timezone.utc)}})
                     db["websites"].update_one({"_id": site["_id"]}, {"$inc": {"stats.offers_found": 1}, "$set": {"stats.last_scan": datetime.now(timezone.utc)}})
                     print(f"  {Fore.GREEN}[+] {brand_name:<20} found {len(result['codes'])} codes{Style.RESET_ALL}")
