@@ -2,19 +2,21 @@
 Scan a single source URL and return extracted deals.
 Used both by the batch pipeline and the admin Deal Scanner.
 """
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from app.services.fetcher import smart_fetch, fetch_direct, is_cloudflare
 from app.extractors import extract_codes_from_soup, detect_countries, extract_discount_value, extract_expiry
 from app.extractors.codes import validate_code
 from app.services.classifier import classify
 from app.services.ai_provider import get_provider
+from app.services.resolver import extract_outbound_links, resolve_final_url, is_redirect_domain
 
 async def scan_source(client, url: str, brand_name: str = "", db=None) -> dict:
     url = url.strip().rstrip("/")
     result = {
         "url": url, "success": False, "status": 0, "source": "direct",
         "blocked": False, "blocked_reason": "", "title": "", "codes": [],
-        "promo_links": [], "countries": [], "deal_type": "", "discount": "", "expiry": None,
+        "promo_links": [], "outbound_links": [], "countries": [], "deal_type": "", "discount": "", "expiry": None,
         "error": "",
     }
     try:
@@ -80,9 +82,33 @@ async def scan_source(client, url: str, brand_name: str = "", db=None) -> dict:
                         continue
                     links.append({"href": href, "text": txt[:80]})
                 ai_links = await provider.classify_promo_links(links, brand_name)
-                result["promo_links"] = [l for l in ai_links if l.startswith("http")][:5]
+                promos = []
+                for l in ai_links:
+                    full = urljoin(url, l)
+                    if full.startswith("http") and full not in promos:
+                        promos.append(full)
+                result["promo_links"] = promos[:5]
             except Exception:
                 pass
+
+        # -- outbound merchant links (Shop Now / Get Code) -> resolve redirects --
+        try:
+            outbound = []
+            for l in extract_outbound_links(url, soup):
+                if not l["is_redirect"]:
+                    continue
+                res = await resolve_final_url(client, l["url"])
+                if res["ok"] and res["domain"] and not is_redirect_domain(res["domain"]):
+                    outbound.append({
+                        "url": l["url"],
+                        "final_url": res["final_url"],
+                        "domain": res["domain"],
+                        "text": l["text"],
+                        "hops": res["hops"],
+                    })
+            result["outbound_links"] = outbound
+        except Exception:
+            pass
 
     except Exception as e:
         result["error"] = str(e)[:200]
