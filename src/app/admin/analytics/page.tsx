@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { adminHeaders } from '@/lib/adminFetch';
 
 export default function AnalyticsPage() {
   const [stats, setStats] = useState<any>(null);
@@ -11,8 +12,8 @@ export default function AnalyticsPage() {
     setLoading(true);
     try {
       const [s, l] = await Promise.all([
-        window.fetch('/api/admin/stats').then(r => r.json()),
-        window.fetch('/api/admin/logs').then(r => r.json().catch(() => ({ logs: [] }))),
+        window.fetch('/api/admin/stats', { headers: adminHeaders(false) }).then(r => r.json()),
+        window.fetch('/api/admin/logs', { headers: adminHeaders(false) }).then(r => r.json().catch(() => ({ logs: [] }))),
       ]);
       setStats(s);
       setLogs(l.logs || []);

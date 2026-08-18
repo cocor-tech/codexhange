@@ -61,9 +61,9 @@ jobs:
         run: |
           MAX="${{ inputs.maxBrands }}"
           if [ -n "$MAX" ]; then
-            python main.py --sources --force --max-per-source "$MAX"
+            python main.py --sources --max-per-source "$MAX"
           else
-            python main.py --sources --force
+            python main.py --sources
           fi
         working-directory: bot
 

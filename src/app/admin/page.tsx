@@ -59,7 +59,7 @@ export default function AdminPage() {
   };
 
   const fetchStats = async () => {
-    const res = await window.fetch('/api/admin/stats');
+    const res = await window.fetch('/api/admin/stats', { headers: adminHeaders(false) });
     if (res.ok) {
       const d = await res.json();
       setStats({

@@ -23,6 +23,14 @@ OUTBOUND_SKIP_DOMAINS = {
 OUTBOUND_SKIP_PATH_RE = re.compile(r"/share|/intent|/sharer|/login|/signin|consent\.", re.I)
 OUTBOUND_DEAL_TEXT = re.compile(r"code|coupon|deal|save|shop|offer|promo|get|reveal|voucher|buy|order|checkout", re.I)
 
+# Page titles that indicate a soft-404 (HTTP 200 with a "not found" template)
+SOFT_404_TITLE_KW = [
+    "page not found", "404 not found", "404 error", "error 404",
+    "this page does not exist", "this page doesn't exist", "page unavailable",
+    "page could not be found", "we can't find", "we cannot find",
+    "not found (404)", "404 - not found", "404 | not found", "oops!",
+]
+
 async def scan_source(client, url: str, brand_name: str = "", db=None) -> dict:
     url = url.strip().rstrip("/")
     result = {
@@ -54,6 +62,22 @@ async def scan_source(client, url: str, brand_name: str = "", db=None) -> dict:
         title_el = soup.find("title")
         result["title"] = title_el.get_text(strip=True) if title_el else ""
         result["page_text"] = text[:20000]
+
+        # Soft-404 detection: HTTP 200 but the page is really a "not found"
+        # page (404 templates from e.g. bestbuy.com). Never extract codes
+        # from these — they'd produce garbage offers like title="Oops Page
+        # Not Found!" with a bogus code.
+        title_l = result["title"].lower()
+        body_head = " ".join(soup.get_text(" ", strip=True)[:1500].lower().split())
+        if not title_l and len(body_head) < 60:
+            result["error"] = "Empty page (no title)"
+            return result
+        if any(kw in title_l for kw in SOFT_404_TITLE_KW) or (
+            "not found" in title_l and ("page" in title_l or "error" in title_l)
+        ):
+            result["error"] = "Soft 404 page"
+            return result
+
         result["codes"] = extract_codes_from_soup(soup, url, brand_name)
         result["discount"] = extract_discount_value(soup.get_text()) or ""
         result["countries"] = detect_countries(url, text, brand_name)

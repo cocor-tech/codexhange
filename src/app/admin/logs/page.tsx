@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { adminHeaders } from '@/lib/adminFetch';
 
 export default function LogsPage() {
   const [logs, setLogs] = useState<any[]>([]);
 
   const load = async () => {
-    const res = await window.fetch('/api/admin/logs');
+    const res = await window.fetch('/api/admin/logs', { headers: adminHeaders(false) });
     if (res.ok) setLogs((await res.json()).logs || []);
   };
 
