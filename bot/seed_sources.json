@@ -1,0 +1,354 @@
+{
+  "batch": [
+    {
+      "name": "retailmenot.com",
+      "url": "https://www.retailmenot.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "hotukdeals.com/vouchers",
+      "url": "https://www.hotukdeals.com/vouchers",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "dealcatcher.com",
+      "url": "https://www.dealcatcher.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "studentbeans.com",
+      "url": "https://www.studentbeans.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "offertle.com",
+      "url": "https://offertle.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "groupon.ie",
+      "url": "https://www.groupon.ie",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "savoo.co.uk",
+      "url": "https://www.savoo.co.uk",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "coupons.com",
+      "url": "https://www.coupons.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "dealnews.com",
+      "url": "https://dealnews.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "digitalwebng.com",
+      "url": "https://www.digitalwebng.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "freestufffinder.com",
+      "url": "https://www.freestufffinder.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "voucherhive.co.uk",
+      "url": "https://www.voucherhive.co.uk",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "smartcanucks.ca",
+      "url": "https://www.smartcanucks.ca",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "myvouchercodes.co.uk",
+      "url": "https://www.myvouchercodes.co.uk",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "offers.com",
+      "url": "https://www.offers.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "radins.com",
+      "url": "https://www.radins.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "couponbind.com",
+      "url": "https://www.couponbind.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "couponcause.com",
+      "url": "https://www.couponcause.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "thevirtualmall.co.uk",
+      "url": "https://www.thevirtualmall.co.uk",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "groupon.co.uk",
+      "url": "https://www.groupon.co.uk",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "savings.com",
+      "url": "https://www.savings.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "vouchercloud.com",
+      "url": "https://www.vouchercloud.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "groupon.com/coupons",
+      "url": "https://www.groupon.com/coupons",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "hip2save.com",
+      "url": "https://hip2save.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "dontpayfull.com",
+      "url": "https://www.dontpayfull.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "joincoupons.com",
+      "url": "https://www.joincoupons.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "techbargains.com",
+      "url": "https://www.techbargains.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "ozbargain.com.au",
+      "url": "https://www.ozbargain.com.au",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "shopback.com.au",
+      "url": "https://www.shopback.com.au",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "thekrazycouponlady.com",
+      "url": "https://www.thekrazycouponlady.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "studentdiscounts.co.uk",
+      "url": "https://studentdiscounts.co.uk",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "livingrichwithcoupons.com",
+      "url": "https://www.livingrichwithcoupons.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "blippr.com",
+      "url": "https://blippr.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "topcashback.com",
+      "url": "https://www.topcashback.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "hunt4freebies.com",
+      "url": "https://hunt4freebies.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "groupon.de",
+      "url": "https://www.groupon.de",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "groupon.fr",
+      "url": "https://www.groupon.fr",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "couponmom.com",
+      "url": "https://www.couponmom.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "mrrebates.com",
+      "url": "https://www.mrrebates.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "dealz.com.ng",
+      "url": "https://dealz.com.ng",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "moneycrashers.com",
+      "url": "https://www.moneycrashers.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "extrabux.com",
+      "url": "https://www.extrabux.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "dealsofamerica.com",
+      "url": "https://www.dealsofamerica.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "mydealz.de",
+      "url": "https://www.mydealz.de",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "simplycodes.com",
+      "url": "https://simplycodes.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "dealabs.fr",
+      "url": "https://www.dealabs.fr",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "chollometro.com",
+      "url": "https://www.chollometro.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "freebies4mom.com",
+      "url": "https://www.freebies4mom.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "wowcher.co.uk",
+      "url": "https://www.wowcher.co.uk",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    },
+    {
+      "name": "unicreds.com",
+      "url": "https://www.unicreds.com",
+      "type": "promo",
+      "frequency_hours": 6,
+      "status": "active"
+    }
+  ]
+}
