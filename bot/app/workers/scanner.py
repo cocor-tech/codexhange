@@ -168,6 +168,12 @@ async def scan_source(client, url: str, brand_name: str = "", db=None) -> dict:
         if not outbound:
             try:
                 merchant_url = _extract_merchant_url(soup, url, brand_name)
+                # Resolve through redirects to find the real booking site
+                # (e.g. econolodge.com -> choicehotels.com)
+                if merchant_url and client:
+                    res = await resolve_final_url(client, merchant_url, max_hops=4)
+                    if res.get("ok") and res.get("final_url"):
+                        merchant_url = res["final_url"]
             except Exception:
                 pass
         result["merchant_url"] = merchant_url
