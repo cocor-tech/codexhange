@@ -511,6 +511,15 @@ async def discover_from_sources(max_per_source=80, force=False):
 
     print(f"\n{Fore.CYAN}=== Done: {total_brands} brands, {total_offers} offers ==={Style.RESET_ALL}")
 
+    # -- re-verify previously published offers (auto-expire dead codes) --
+    try:
+        from app.workers.verifier import reverify_all
+        print(f"\n{Fore.CYAN}=== Re-verifying offers from {len(due)} crawled sources ==={Style.RESET_ALL}")
+        vstats = await reverify_all(db, client, sources=due)
+        print(f"  Checked {vstats['checked']} offers, expired {vstats['expired']} dead codes")
+    except Exception as e:
+        print(f"  {Fore.YELLOW}[!] Re-verify skipped: {e}{Style.RESET_ALL}")
+
     # -- AI enrichment + cross-source comparison (only when AI is configured) --
     try:
         provider = load_provider(db)
@@ -634,7 +643,7 @@ def reset_new_model():
     close()
 
 def main():
-    VERSION = "2.4.0"
+    VERSION = "2.5.0"
     p = argparse.ArgumentParser(description="Codexhange Offer Intelligence Platform")
     p.add_argument("--scan", action="store_true", help="Scan all active websites")
     p.add_argument("--sources", action="store_true", help="Discover brands + offers from crawl sources")
@@ -645,6 +654,7 @@ def main():
     p.add_argument("--names", type=str, help="Filter by brand names (comma-separated)")
     p.add_argument("--stale", action="store_true", help="Scan websites not checked in 24h")
     p.add_argument("--compare", action="store_true", help="AI cross-source compare: score + dedupe offers per brand")
+    p.add_argument("--reverify", action="store_true", help="Re-check published offers against their sources; soft-expire dead codes (health /5)")
     p.add_argument("--seed-sources", type=str, metavar="FILE", help="Seed sources collection from a JSON file [{name,url,type,frequency_hours,status}]")
     p.add_argument("--purge-expired", action="store_true", help="Mark expired offers")
     p.add_argument("--reset", action="store_true", help="Full reset: wipe all data (sources, users, offers, websites, urls)")
@@ -691,6 +701,16 @@ def main():
             stats = await compare_all_brands(db, provider)
             print(f"Compared {stats['brands']} brands / {stats['offers']} offers, "
                   f"archived {stats['archived']} duplicates")
+            close()
+        asyncio.run(_run()); return
+    if args.reverify:
+        from app.workers.verifier import reverify_all
+        db = connect()
+        async def _run():
+            async with create_shared_client() as client:
+                stats = await reverify_all(db, client)
+                print(f"Checked {stats['checked']} offers across {stats['sources']} sources, "
+                      f"expired {stats['expired']} dead codes")
             close()
         asyncio.run(_run()); return
     if args.sources:

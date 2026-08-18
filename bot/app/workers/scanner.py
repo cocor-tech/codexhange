@@ -53,6 +53,7 @@ async def scan_source(client, url: str, brand_name: str = "", db=None) -> dict:
         soup = BeautifulSoup(text, "lxml")
         title_el = soup.find("title")
         result["title"] = title_el.get_text(strip=True) if title_el else ""
+        result["page_text"] = text[:20000]
         result["codes"] = extract_codes_from_soup(soup, url, brand_name)
         result["discount"] = extract_discount_value(soup.get_text()) or ""
         result["countries"] = detect_countries(url, text, brand_name)
