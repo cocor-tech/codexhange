@@ -275,6 +275,222 @@ def upsert_website(db, slug: str, name: str, domain: str, level: int, now) -> st
             return ws["_id"]
         raise
 
+
+async def process_source(db, client, src, now, max_per_source=80):
+    """Crawl one source: discover brand pages, scan them, upsert offers."""
+    from app.services.resolver import resolve_final_url, looks_like_redirect, is_redirect_domain
+    from urllib.parse import urlparse as _up
+
+    def canonical_domain(url: str) -> str:
+        try:
+            return _up(url).netloc.lower().replace("www.", "")
+        except Exception:
+            return ""
+
+    sid = src["_id"]
+    base = src.get("url", "").rstrip('/')
+    sname = src.get("name", base)
+    if not base:
+        return 0, 0
+    level = int(src.get("scanLevel") or 2)
+    cap = min(max_per_source, LEVEL_MAX_PER_SOURCE.get(level, 40))
+    started = time.monotonic()
+
+    # 1) homepage links
+    brand_pages = {}
+    html = await fetch_text(client, base, timeout=LEVEL_MAX_TIME.get(level, 12.0))
+    if html:
+        soup = BeautifulSoup(html, 'lxml')
+        for a in soup.find_all('a', href=True):
+            try:
+                full = urljoin(base, a['href'])
+            except Exception:
+                continue
+            if not same_host(full, base):
+                continue
+            slug = find_slug_in_url(urlparse(full).path)
+            if not slug:
+                continue
+            if slug not in brand_pages:
+                brand_pages[slug] = full
+
+    # 2) sitemap
+    sitemap_urls = await fetch_sitemap_urls(client, base)
+    for u in sitemap_urls:
+        if not same_host(u, base):
+            continue
+        slug = find_slug_in_url(urlparse(u).path)
+        if slug and slug not in brand_pages:
+            brand_pages[slug] = u
+
+    if not brand_pages:
+        db["sources"].update_one({"_id": sid}, {"$set": {
+            "stats.last_scan": now, "stats.last_error": "no brand pages found"}})
+        write_log(db, sname, "found_none", error="no brand pages found")
+        print(f"  {Fore.YELLOW}[-] {sname:<24} 0 brand pages{Style.RESET_ALL}")
+        return 0, 0
+
+    slugs = list(brand_pages.keys())[:cap]
+    discovered = 0
+    offers = 0
+
+    for slug in slugs:
+        page_url = brand_pages[slug]
+        bname = normalize_brand_name(slug)
+        source_domain = canonical_domain(base)
+
+        # -- resolve the brand page itself if it's a redirect --
+        merchant_url = page_url
+        if looks_like_redirect(page_url):
+            res = await resolve_final_url(client, page_url)
+            if res.get("ok") and not is_redirect_domain(res.get("domain", "")):
+                merchant_url = res["final_url"]
+
+        # -- upsert Website (company entity) --
+        ws_id = upsert_website(db, slug, bname, canonical_domain(merchant_url), level, now)
+        discovered += 1
+
+        # -- upsert Url (source brand page) grouped under the website --
+        url_doc = db["urls"].find_one({"url": page_url})
+        if not url_doc:
+            url_id = db["urls"].insert_one({
+                "websiteId": ws_id, "url": page_url,
+                "domain": canonical_domain(page_url),
+                "kind": "source_page", "source": sname, "status": "active",
+                "stats": {"offers_found": 0, "blocked_count": 0, "health_score": 100},
+                "createdAt": now, "updatedAt": now,
+            }).inserted_id
+        else:
+            url_id = url_doc["_id"]
+            db["urls"].update_one({"_id": url_id},
+                {"$set": {"websiteId": ws_id, "source": sname, "updatedAt": now}})
+
+        # -- also store the resolved merchant homepage URL (if it's a real site) --
+        resolved_id = None
+        if merchant_url != page_url and canonical_domain(merchant_url) != source_domain:
+            mdoc = db["urls"].find_one({"url": merchant_url})
+            if not mdoc:
+                resolved_id = db["urls"].insert_one({
+                    "websiteId": ws_id, "url": merchant_url,
+                    "domain": canonical_domain(merchant_url),
+                    "kind": "homepage", "source": sname, "status": "active",
+                    "stats": {"offers_found": 0, "blocked_count": 0, "health_score": 100},
+                    "createdAt": now, "updatedAt": now,
+                }).inserted_id
+            else:
+                resolved_id = mdoc["_id"]
+
+        # -- scan the source brand page for codes --
+        result = await scan_source(client, page_url, bname, db=db)
+        if result.get("blocked"):
+            db["urls"].update_one({"_id": url_id}, {"$inc": {"stats.blocked_count": 1}})
+            continue
+        if result.get("success") and result.get("codes"):
+            code = result["codes"][0] if result["codes"] else None
+            # Prefer the resolved merchant URL from a "Shop Now"/"Get Code"
+            # button over the aggregator brand page itself.
+            dest = merchant_url
+            outbound = result.get("outbound_links") or []
+            if outbound:
+                dest = outbound[0]["final_url"]
+            deal = Deal(
+                store_name=bname,
+                deal_type=result.get("deal_type", "sale"),
+                code=code,
+                title=str(result.get("title") or f"{bname} offer")[:200],
+                destination_url=dest,
+                source_page=page_url,
+                confidence_score=85 if code else 60,
+                strategy="source_discovery",
+                countries=result.get("countries", []),
+                discount_value=result.get("discount", ""),
+            )
+            doc = build_document(deal, ws_id, {"name": bname, "slug": slug})
+            doc["store_name"] = bname
+            doc["websiteId"] = ws_id
+            doc["urlId"] = url_id
+            if resolved_id:
+                doc["resolvedUrlId"] = resolved_id
+            upsert_offer(db, doc, ws_id, doc["sourceUrl"])
+            # Drop stale offers for this page when the merchant URL changed
+            db.offers.delete_many({"websiteId": ws_id, "sourcePage": page_url,
+                                   "sourceUrl": {"$ne": doc["sourceUrl"]}})
+            offers += 1
+
+        # -- crawl AI-detected promo/coupon links found on the brand page --
+        for promo_url in result.get("promo_links", [])[:3]:
+            try:
+                full = urljoin(page_url, promo_url)
+            except Exception:
+                continue
+            if not same_host(full, page_url):
+                continue
+            pdoc = db["urls"].find_one({"url": full})
+            if not pdoc:
+                p_url_id = db["urls"].insert_one({
+                    "websiteId": ws_id, "url": full,
+                    "domain": canonical_domain(full),
+                    "kind": "coupon_page", "source": sname, "status": "active",
+                    "stats": {"offers_found": 0, "blocked_count": 0, "health_score": 100},
+                    "createdAt": now, "updatedAt": now,
+                }).inserted_id
+            else:
+                p_url_id = pdoc["_id"]
+                db["urls"].update_one({"_id": p_url_id},
+                    {"$set": {"websiteId": ws_id, "source": sname, "updatedAt": now}})
+
+            pres = await scan_source(client, full, bname, db=db)
+            if pres.get("blocked") or not pres.get("success"):
+                continue
+            if pres.get("codes"):
+                pcode = pres["codes"][0]
+                pdeal = Deal(
+                    store_name=bname,
+                    deal_type=pres.get("deal_type", "code" if pcode else "sale"),
+                    code=pcode,
+                    title=str(pres.get("title") or f"{bname} offer")[:200],
+                    destination_url=full,
+                    source_page=full,
+                    confidence_score=85 if pcode else 60,
+                    strategy="source_discovery",
+                    countries=pres.get("countries", []),
+                    discount_value=pres.get("discount", ""),
+                )
+                pdoc_b = build_document(pdeal, ws_id, {"name": bname, "slug": slug})
+                pdoc_b["store_name"] = bname
+                pdoc_b["websiteId"] = ws_id
+                pdoc_b["urlId"] = p_url_id
+                upsert_offer(db, pdoc_b, ws_id, pdoc_b["sourceUrl"])
+                db.offers.delete_many({"websiteId": ws_id, "sourcePage": full,
+                                       "sourceUrl": {"$ne": pdoc_b["sourceUrl"]}})
+                offers += 1
+            db["urls"].update_one({"_id": p_url_id},
+                {"$set": {"stats.last_scan": now, "stats.offers_found": 1 if pres.get("codes") else 0}})
+
+        db["urls"].update_one({"_id": url_id},
+            {"$set": {"stats.last_scan": now, "stats.offers_found": offers}})
+        db["websites"].update_one({"_id": ws_id},
+            {"$set": {"stats.last_scan": now, "stats.offers_found": offers}})
+
+    elapsed = time.monotonic() - started
+    prev_avg = src.get("avgScanTime") or elapsed
+    avg = round(0.7 * prev_avg + 0.3 * elapsed, 2)
+    level = classify_level(avg)
+    next_scan = now + timedelta(hours=LEVEL_INTERVALS[level])
+    db["sources"].update_one({"_id": sid}, {"$set": {
+        "scanLevel": level,
+        "avgScanTime": avg,
+        "nextScanAt": next_scan,
+        "stats.brands_found": discovered,
+        "stats.offers_found": offers,
+        "stats.last_scan": now,
+        "stats.last_error": None}})
+    write_log(db, sname, "success", found=discovered, submitted=offers)
+    print(f"  {Fore.GREEN}[+] {sname:<24} L{level} {avg:.1f}s brands={discovered} offers={offers} next={next_scan.strftime('%m-%d %H:%M')}{Style.RESET_ALL}")
+
+    return discovered, offers
+
+
 async def discover_from_sources(max_per_source=80, force=False):
     """Crawl the sources collection (coupon aggregators) and discover brands + codes.
 
@@ -287,9 +503,6 @@ async def discover_from_sources(max_per_source=80, force=False):
     Scan levels: sources are grouped by speed (1 fast / 2 medium / 3 slow) based on
     measured scan time; each level is scanned on its own schedule (6h / 24h / 72h).
     """
-    from app.services.resolver import resolve_final_url, looks_like_redirect, is_redirect_domain
-    from urllib.parse import urlparse as _up
-
     db = connect()
     now = datetime.now(timezone.utc)
     sources = list(db["sources"].find({"status": "active"}))
@@ -300,251 +513,56 @@ async def discover_from_sources(max_per_source=80, force=False):
     print(f"{Fore.CYAN}=== Source discovery: {len(due)} due sources ==={Style.RESET_ALL}\n")
     total_brands, total_offers = 0, 0
 
-    def canonical_domain(url: str) -> str:
-        try:
-            return _up(url).netloc.lower().replace("www.", "")
-        except Exception:
-            return ""
-
     async with create_shared_client() as client:
         for src in due:
-            sid = src["_id"]
-            base = src.get("url", "").rstrip('/')
-            sname = src.get("name", base)
-            if not base:
-                continue
-            level = int(src.get("scanLevel") or 2)
-            cap = min(max_per_source, LEVEL_MAX_PER_SOURCE.get(level, 40))
-            started = time.monotonic()
+            sname = src.get("name") or src.get("url", "?")
+            try:
+                d, o = await process_source(db, client, src, now, max_per_source)
+                total_brands += d
+                total_offers += o
+            except Exception as e:
+                write_log(db, sname, "failed", error=str(e)[:200])
+                print(f"  {Fore.RED}[-] {sname:<24} error: {e}{Style.RESET_ALL}")
 
-            # 1) homepage links
-            brand_pages = {}
-            html = await fetch_text(client, base, timeout=LEVEL_MAX_TIME.get(level, 12.0))
-            if html:
-                soup = BeautifulSoup(html, 'lxml')
-                for a in soup.find_all('a', href=True):
-                    try:
-                        full = urljoin(base, a['href'])
-                    except Exception:
-                        continue
-                    if not same_host(full, base):
-                        continue
-                    slug = find_slug_in_url(urlparse(full).path)
-                    if not slug:
-                        continue
-                    if slug not in brand_pages:
-                        brand_pages[slug] = full
+        print(f"\n{Fore.CYAN}=== Done: {total_brands} brands, {total_offers} offers ==={Style.RESET_ALL}")
 
-            # 2) sitemap
-            sitemap_urls = await fetch_sitemap_urls(client, base)
-            for u in sitemap_urls:
-                if not same_host(u, base):
-                    continue
-                slug = find_slug_in_url(urlparse(u).path)
-                if slug and slug not in brand_pages:
-                    brand_pages[slug] = u
 
-            if not brand_pages:
-                db["sources"].update_one({"_id": sid}, {"$set": {
-                    "stats.last_scan": now, "stats.last_error": "no brand pages found"}})
-                write_log(db, sname, "found_none", error="no brand pages found")
-                print(f"  {Fore.YELLOW}[-] {sname:<24} 0 brand pages{Style.RESET_ALL}")
-                continue
+        # -- re-verify previously published offers (auto-expire dead codes) --
+        try:
+            from app.workers.verifier import reverify_all
+            print(f"\n{Fore.CYAN}=== Re-verifying offers from {len(due)} crawled sources ==={Style.RESET_ALL}")
+            vstats = await reverify_all(db, client, sources=due)
+            print(f"  Checked {vstats['checked']} offers, expired {vstats['expired']} dead codes")
+            write_log(db, "reverify", "success", found=vstats["checked"], submitted=vstats["expired"])
+        except Exception as e:
+            print(f"  {Fore.YELLOW}[!] Re-verify skipped: {e}{Style.RESET_ALL}")
 
-            slugs = list(brand_pages.keys())[:cap]
-            discovered = 0
-            offers = 0
+        # -- AI enrichment + cross-source comparison (only when AI is configured) --
+        try:
+            provider = load_provider(db)
+            if not isinstance(provider, NullProvider):
+                from app.workers.comparer import compare_all_brands
+                print(f"\n{Fore.CYAN}=== AI cross-source comparison ==={Style.RESET_ALL}")
+                to_enrich = list(db.offers.find({"strategy": "source_discovery",
+                                                 "enriched": {"$ne": True}}).limit(150))
+                if to_enrich:
+                    enriched = await enrich_batch(to_enrich, provider)
+                    for e in enriched:
+                        db.offers.update_one({"_id": e["_id"]}, {"$set": {
+                            "title": e.get("title"), "deal_type": e.get("deal_type"),
+                            "tags": e.get("tags", []), "enriched": True,
+                        }})
+                    print(f"  Enriched {len(enriched)} offers")
+                stats = await compare_all_brands(db, provider)
+                print(f"  Compared {stats['brands']} brands / {stats['offers']} offers, "
+                      f"archived {stats['archived']} duplicates")
+                write_log(db, "compare", "success", found=stats["brands"], submitted=stats["archived"])
+        except Exception as e:
+            print(f"  {Fore.YELLOW}[!] AI compare skipped: {e}{Style.RESET_ALL}")
 
-            for slug in slugs:
-                page_url = brand_pages[slug]
-                bname = normalize_brand_name(slug)
-                source_domain = canonical_domain(base)
 
-                # -- resolve the brand page itself if it's a redirect --
-                merchant_url = page_url
-                if looks_like_redirect(page_url):
-                    res = await resolve_final_url(client, page_url)
-                    if res.get("ok") and not is_redirect_domain(res.get("domain", "")):
-                        merchant_url = res["final_url"]
-
-                # -- upsert Website (company entity) --
-                ws_id = upsert_website(db, slug, bname, canonical_domain(merchant_url), level, now)
-                discovered += 1
-
-                # -- upsert Url (source brand page) grouped under the website --
-                url_doc = db["urls"].find_one({"url": page_url})
-                if not url_doc:
-                    url_id = db["urls"].insert_one({
-                        "websiteId": ws_id, "url": page_url,
-                        "domain": canonical_domain(page_url),
-                        "kind": "source_page", "source": sname, "status": "active",
-                        "stats": {"offers_found": 0, "blocked_count": 0, "health_score": 100},
-                        "createdAt": now, "updatedAt": now,
-                    }).inserted_id
-                else:
-                    url_id = url_doc["_id"]
-                    db["urls"].update_one({"_id": url_id},
-                        {"$set": {"websiteId": ws_id, "source": sname, "updatedAt": now}})
-
-                # -- also store the resolved merchant homepage URL (if it's a real site) --
-                resolved_id = None
-                if merchant_url != page_url and canonical_domain(merchant_url) != source_domain:
-                    mdoc = db["urls"].find_one({"url": merchant_url})
-                    if not mdoc:
-                        resolved_id = db["urls"].insert_one({
-                            "websiteId": ws_id, "url": merchant_url,
-                            "domain": canonical_domain(merchant_url),
-                            "kind": "homepage", "source": sname, "status": "active",
-                            "stats": {"offers_found": 0, "blocked_count": 0, "health_score": 100},
-                            "createdAt": now, "updatedAt": now,
-                        }).inserted_id
-                    else:
-                        resolved_id = mdoc["_id"]
-
-                # -- scan the source brand page for codes --
-                result = await scan_source(client, page_url, bname, db=db)
-                if result.get("blocked"):
-                    db["urls"].update_one({"_id": url_id}, {"$inc": {"stats.blocked_count": 1}})
-                    continue
-                if result.get("success") and result.get("codes"):
-                    code = result["codes"][0] if result["codes"] else None
-                    # Prefer the resolved merchant URL from a "Shop Now"/"Get Code"
-                    # button over the aggregator brand page itself.
-                    dest = merchant_url
-                    outbound = result.get("outbound_links") or []
-                    if outbound:
-                        dest = outbound[0]["final_url"]
-                    deal = Deal(
-                        store_name=bname,
-                        deal_type=result.get("deal_type", "sale"),
-                        code=code,
-                        title=str(result.get("title") or f"{bname} offer")[:200],
-                        destination_url=dest,
-                        source_page=page_url,
-                        confidence_score=85 if code else 60,
-                        strategy="source_discovery",
-                        countries=result.get("countries", []),
-                        discount_value=result.get("discount", ""),
-                    )
-                    doc = build_document(deal, ws_id, {"name": bname, "slug": slug})
-                    doc["store_name"] = bname
-                    doc["websiteId"] = ws_id
-                    doc["urlId"] = url_id
-                    if resolved_id:
-                        doc["resolvedUrlId"] = resolved_id
-                    upsert_offer(db, doc, ws_id, doc["sourceUrl"])
-                    # Drop stale offers for this page when the merchant URL changed
-                    db.offers.delete_many({"websiteId": ws_id, "sourcePage": page_url,
-                                           "sourceUrl": {"$ne": doc["sourceUrl"]}})
-                    offers += 1
-
-                # -- crawl AI-detected promo/coupon links found on the brand page --
-                for promo_url in result.get("promo_links", [])[:3]:
-                    try:
-                        full = urljoin(page_url, promo_url)
-                    except Exception:
-                        continue
-                    if not same_host(full, page_url):
-                        continue
-                    pdoc = db["urls"].find_one({"url": full})
-                    if not pdoc:
-                        p_url_id = db["urls"].insert_one({
-                            "websiteId": ws_id, "url": full,
-                            "domain": canonical_domain(full),
-                            "kind": "coupon_page", "source": sname, "status": "active",
-                            "stats": {"offers_found": 0, "blocked_count": 0, "health_score": 100},
-                            "createdAt": now, "updatedAt": now,
-                        }).inserted_id
-                    else:
-                        p_url_id = pdoc["_id"]
-                        db["urls"].update_one({"_id": p_url_id},
-                            {"$set": {"websiteId": ws_id, "source": sname, "updatedAt": now}})
-
-                    pres = await scan_source(client, full, bname, db=db)
-                    if pres.get("blocked") or not pres.get("success"):
-                        continue
-                    if pres.get("codes"):
-                        pcode = pres["codes"][0]
-                        pdeal = Deal(
-                            store_name=bname,
-                            deal_type=pres.get("deal_type", "code" if pcode else "sale"),
-                            code=pcode,
-                            title=str(pres.get("title") or f"{bname} offer")[:200],
-                            destination_url=full,
-                            source_page=full,
-                            confidence_score=85 if pcode else 60,
-                            strategy="source_discovery",
-                            countries=pres.get("countries", []),
-                            discount_value=pres.get("discount", ""),
-                        )
-                        pdoc_b = build_document(pdeal, ws_id, {"name": bname, "slug": slug})
-                        pdoc_b["store_name"] = bname
-                        pdoc_b["websiteId"] = ws_id
-                        pdoc_b["urlId"] = p_url_id
-                        upsert_offer(db, pdoc_b, ws_id, pdoc_b["sourceUrl"])
-                        db.offers.delete_many({"websiteId": ws_id, "sourcePage": full,
-                                               "sourceUrl": {"$ne": pdoc_b["sourceUrl"]}})
-                        offers += 1
-                    db["urls"].update_one({"_id": p_url_id},
-                        {"$set": {"stats.last_scan": now, "stats.offers_found": 1 if pres.get("codes") else 0}})
-
-                db["urls"].update_one({"_id": url_id},
-                    {"$set": {"stats.last_scan": now, "stats.offers_found": offers}})
-                db["websites"].update_one({"_id": ws_id},
-                    {"$set": {"stats.last_scan": now, "stats.offers_found": offers}})
-
-            elapsed = time.monotonic() - started
-            prev_avg = src.get("avgScanTime") or elapsed
-            avg = round(0.7 * prev_avg + 0.3 * elapsed, 2)
-            level = classify_level(avg)
-            next_scan = now + timedelta(hours=LEVEL_INTERVALS[level])
-            db["sources"].update_one({"_id": sid}, {"$set": {
-                "scanLevel": level,
-                "avgScanTime": avg,
-                "nextScanAt": next_scan,
-                "stats.brands_found": discovered,
-                "stats.offers_found": offers,
-                "stats.last_scan": now,
-                "stats.last_error": None}})
-            total_brands += discovered
-            total_offers += offers
-            write_log(db, sname, "success", found=discovered, submitted=offers)
-            print(f"  {Fore.GREEN}[+] {sname:<24} L{level} {avg:.1f}s brands={discovered} offers={offers} next={next_scan.strftime('%m-%d %H:%M')}{Style.RESET_ALL}")
-
-    print(f"\n{Fore.CYAN}=== Done: {total_brands} brands, {total_offers} offers ==={Style.RESET_ALL}")
-
-    # -- re-verify previously published offers (auto-expire dead codes) --
-    try:
-        from app.workers.verifier import reverify_all
-        print(f"\n{Fore.CYAN}=== Re-verifying offers from {len(due)} crawled sources ==={Style.RESET_ALL}")
-        vstats = await reverify_all(db, client, sources=due)
-        print(f"  Checked {vstats['checked']} offers, expired {vstats['expired']} dead codes")
-        write_log(db, "reverify", "success", found=vstats["checked"], submitted=vstats["expired"])
-    except Exception as e:
-        print(f"  {Fore.YELLOW}[!] Re-verify skipped: {e}{Style.RESET_ALL}")
-
-    # -- AI enrichment + cross-source comparison (only when AI is configured) --
-    try:
-        provider = load_provider(db)
-        if not isinstance(provider, NullProvider):
-            from app.workers.comparer import compare_all_brands
-            print(f"\n{Fore.CYAN}=== AI cross-source comparison ==={Style.RESET_ALL}")
-            to_enrich = list(db.offers.find({"strategy": "source_discovery",
-                                             "enriched": {"$ne": True}}).limit(150))
-            if to_enrich:
-                enriched = await enrich_batch(to_enrich, provider)
-                for e in enriched:
-                    db.offers.update_one({"_id": e["_id"]}, {"$set": {
-                        "title": e.get("title"), "deal_type": e.get("deal_type"),
-                        "tags": e.get("tags", []), "enriched": True,
-                    }})
-                print(f"  Enriched {len(enriched)} offers")
-            stats = await compare_all_brands(db, provider)
-            print(f"  Compared {stats['brands']} brands / {stats['offers']} offers, "
-                  f"archived {stats['archived']} duplicates")
-            write_log(db, "compare", "success", found=stats["brands"], submitted=stats["archived"])
-    except Exception as e:
-        print(f"  {Fore.YELLOW}[!] AI compare skipped: {e}{Style.RESET_ALL}")
+    write_log(db, "source_discovery", "success", found=total_brands, submitted=total_offers,
+              error=None if due else "0 sources due this run")
 
     close()
 
