@@ -555,7 +555,8 @@ async def discover_from_sources(max_per_source=80, force=False):
     db = connect()
     now = datetime.now(timezone.utc)
     sources = list(db["sources"].find({"status": "active"}))
-    due = [s for s in sources if force or not s.get("nextScanAt") or s["nextScanAt"] <= now]
+    due = [s for s in sources if force or not s.get("nextScanAt") or
+           s["nextScanAt"].replace(tzinfo=timezone.utc) <= now]
     skipped = len(sources) - len(due)
     if skipped:
         print(f"{Fore.YELLOW}=== Skipping {skipped} sources not due yet (scan levels) ==={Style.RESET_ALL}")
