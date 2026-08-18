@@ -31,8 +31,8 @@ REDIRECT_DOMAINS = [
 ]
 
 REDIRECT_PATH_RE = re.compile(
-    r'/out/|/go/|/redirect|/track|/click|/c/|/away|/out\.php|/redirect\.php|/link\.php|'
-    r'/goto|/hop/|/rd/|/r/|/clk/|/bit\.ly|/redirect\.aspx|/redir|/c\.php|/track\.php',
+    r'^/out/|^/go/|^/redirect|/track|/click|^/c/|^/away|^/out\.php|^/redirect\.php|^/link\.php|'
+    r'^/goto|^/hop/|^/rd/|^/r/|^/l/|^/clk/|bit\.ly|^/redirect\.aspx|^/redir|^/c\.php|^/track\.php',
     re.I,
 )
 
@@ -177,7 +177,11 @@ def extract_outbound_links(base: str, soup, exclude_domain: str = "") -> list:
         text = a.get_text(strip=True)[:80].lower()
         if not full.startswith("http"):
             continue
-        if host == base_host or host == exclude:
+        if host == exclude:
+            continue
+        # same-host links are only outbound if their path is a known redirect
+        # (e.g. coupons.com/l/123 → redirects to homedepot.com)
+        if host == base_host and not looks_like_redirect(full):
             continue
         key = full.rstrip("/").lower()
         if key in seen:

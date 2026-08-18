@@ -22,13 +22,19 @@ ADAPTERS = [HomepageAdapter(), CrawlerAdapter(), LinkDiscoveryAdapter()]
 SEMAPHORE = asyncio.Semaphore(settings.CONCURRENCY)
 
 BRAND_PATH_PATTERNS = [
-    re.compile(r'/(?:store|stores|brand|brands|coupon|coupons|promo|promos|promo-code|deal|deals|offer|offers|discount|discounts|voucher|vouchers)/([a-z0-9][a-z0-9\-]{1,63})/?$', re.I),
-    re.compile(r'/c/([a-z0-9][a-z0-9\-]{1,63})/?$', re.I),
+    re.compile(r'/(?:store|stores|brand|brands|coupon|coupons|coupon-code|coupon-codes|promo|promos|promo-code|promo-codes|deal|deals|offer|offers|discount|discounts|voucher|vouchers|view|student-offer|student-offers)/([a-z0-9][a-z0-9\-\.]{1,63})/?$', re.I),
+    re.compile(r'/c/([a-z0-9][a-z0-9\-\.]{1,63})/?$', re.I),
+    re.compile(r'/s\d+/(?:[^/]+/)*([a-z0-9][a-z0-9\-]{1,63})/?$', re.I),
+    re.compile(r'/([a-z0-9]{4,30})/?$', re.I),
 ]
 SKIP_SLUGS = {'home', 'all', 'shop', 'login', 'signin', 'signup', 'register', 'cart',
               'checkout', 'contact', 'about', 'help', 'faq', 'privacy', 'terms',
               'sitemap', 'feed', 'feed.xml', 'robots.txt', 'search', 'category',
-              'categories', 'stores', 'store', 'brands', 'brand', 'coupons', 'deals'}
+              'categories', 'stores', 'store', 'brands', 'brand', 'coupons', 'deals',
+              'coupon-codes', 'coupon-code', 'promo-codes', 'promo-code', 'view',
+              'browse', 'resources', 'student-discounts', 'discounts', 'offers',
+              'gift-cards', 'giftcard', 'giftcards', 'competitions', 'blog', 'news',
+              'press', 'careers', 'jobs', 'vouchers', 'voucher', 'promos', 'promo'}
 
 def write_log(db, name, status, found=0, submitted=0, error=""):
     try:
@@ -54,13 +60,46 @@ def normalize_brand_name(slug: str) -> str:
     parts = [p for p in name.split() if p]
     return ' '.join(p.capitalize() for p in parts) if parts else slug
 
+# Nav/utility tokens that appear as bare slugs on coupon sites but are not brands
+NAV_TOKENS = {
+    'about','contact','privacy','terms','conditions','policy','cookies','cookie',
+    'delivery','shipping','returns','help','support','faqs','faq','blog','news',
+    'press','media','careers','jobs','investors','corporate','sustainability',
+    'affiliate','affiliates','partners','partner','programs','programme','events',
+    'awards','account','login','signin','signup','register','wishlist','basket',
+    'cart','checkout','loyalty','rewards','reviews','review','testimonials',
+    'catalog','catalogue','categories','category','browse','resources','services',
+    'mobile','app','apps','download','downloads','developers','api','docs',
+    'feedback','advertise','advertising','work','works','shop','stores','store',
+    'stores-directory','directory','vouchers','voucher','coupons','coupon',
+    'promos','promo','deals','deal','offers','offer','discounts','discount',
+    'sitemap','sitemaps','giftcards','gift-cards','giftcard','competitions',
+    'competition','giveaways','giveaway','win','winner','winners','latest','new',
+    'trending','popular','top','best','featured','exclusive','exclusives',
+    'student','students','students-discount','education','teachers','healthcare',
+    'military','seniors','first-time','first-order','newsletter','subscribe',
+    'email','whatsapp','app-download','free','freebies','savings','save','sale',
+    'clearance','outlet','sale-items','seasonal','season','summer','winter',
+    'spring','autumn','christmas','easter','black-friday','cyber-monday',
+    'halloween','valentines','mothers-day','fathers-day','back-to-school',
+}
+
 def find_slug_in_url(path: str):
-    for pat in BRAND_PATH_PATTERNS:
+    from app.extractors.codes import COMMON_WORDS
+    for i, pat in enumerate(BRAND_PATH_PATTERNS):
         m = pat.search(path)
-        if m:
-            slug = m.group(1).lower()
-            if slug not in SKIP_SLUGS:
-                return slug
+        if not m:
+            continue
+        slug = m.group(1).lower()
+        slug = re.sub(r'\.(com|co\.uk|co|net|org|uk|ca|com\.au|co\.nz)$', '', slug)
+        slug = slug.strip('.')
+        if not slug or slug in SKIP_SLUGS:
+            continue
+        if i >= 3:  # bare-slug pattern only — must look like a brand, not a nav page
+            tokens = set(re.split(r'[-_]', slug))
+            if slug.upper() in COMMON_WORDS or tokens & NAV_TOKENS:
+                continue
+        return slug
     return None
 
 async def check_alive(url: str) -> bool:
@@ -385,22 +424,25 @@ async def process_source(db, client, src, now, max_per_source=80):
         if result.get("blocked"):
             db["urls"].update_one({"_id": url_id}, {"$inc": {"stats.blocked_count": 1}})
             continue
-        if result.get("success") and result.get("codes"):
-            code = result["codes"][0] if result["codes"] else None
+        codes = result.get("codes") or []
+        outbound = result.get("outbound_links") or []
+        # A page is a "code" page when a code was extracted, otherwise a
+        # "link/deal" page when it points at a merchant (Shop Now / Get Deal).
+        if result.get("success") and (codes or outbound):
+            code = codes[0] if codes else None
             # Prefer the resolved merchant URL from a "Shop Now"/"Get Code"
             # button over the aggregator brand page itself.
             dest = merchant_url
-            outbound = result.get("outbound_links") or []
             if outbound:
-                dest = outbound[0]["final_url"]
+                dest = outbound[0]["url"]
             deal = Deal(
                 store_name=bname,
-                deal_type=result.get("deal_type", "sale"),
+                deal_type="code" if code else "deal",
                 code=code,
                 title=str(result.get("title") or f"{bname} offer")[:200],
                 destination_url=dest,
                 source_page=page_url,
-                confidence_score=85 if code else 60,
+                confidence_score=85 if code else 55,
                 strategy="source_discovery",
                 countries=result.get("countries", []),
                 discount_value=result.get("discount", ""),
@@ -442,16 +484,21 @@ async def process_source(db, client, src, now, max_per_source=80):
             pres = await scan_source(client, full, bname, db=db)
             if pres.get("blocked") or not pres.get("success"):
                 continue
-            if pres.get("codes"):
-                pcode = pres["codes"][0]
+            pcodes = pres.get("codes") or []
+            poutbound = pres.get("outbound_links") or []
+            if pcodes or poutbound:
+                pcode = pcodes[0] if pcodes else None
+                pdest = full
+                if poutbound:
+                    pdest = poutbound[0]["url"]
                 pdeal = Deal(
                     store_name=bname,
-                    deal_type=pres.get("deal_type", "code" if pcode else "sale"),
+                    deal_type="code" if pcode else "deal",
                     code=pcode,
                     title=str(pres.get("title") or f"{bname} offer")[:200],
-                    destination_url=full,
+                    destination_url=pdest,
                     source_page=full,
-                    confidence_score=85 if pcode else 60,
+                    confidence_score=85 if pcode else 55,
                     strategy="source_discovery",
                     countries=pres.get("countries", []),
                     discount_value=pres.get("discount", ""),
@@ -465,7 +512,7 @@ async def process_source(db, client, src, now, max_per_source=80):
                                        "sourceUrl": {"$ne": pdoc_b["sourceUrl"]}})
                 offers += 1
             db["urls"].update_one({"_id": p_url_id},
-                {"$set": {"stats.last_scan": now, "stats.offers_found": 1 if pres.get("codes") else 0}})
+                {"$set": {"stats.last_scan": now, "stats.offers_found": 1 if pcodes or poutbound else 0}})
 
         db["urls"].update_one({"_id": url_id},
             {"$set": {"stats.last_scan": now, "stats.offers_found": offers}})

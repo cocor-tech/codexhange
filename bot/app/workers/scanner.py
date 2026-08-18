@@ -79,6 +79,7 @@ async def scan_source(client, url: str, brand_name: str = "", db=None) -> dict:
             return result
 
         result["codes"] = extract_codes_from_soup(soup, url, brand_name)
+        result["is_code"] = bool(result["codes"])
         result["discount"] = extract_discount_value(soup.get_text()) or ""
         result["countries"] = detect_countries(url, text, brand_name)
         result["expiry"] = extract_expiry(soup.get_text())
@@ -107,6 +108,9 @@ async def scan_source(client, url: str, brand_name: str = "", db=None) -> dict:
                             seen.add(v)
             except Exception:
                 pass
+            # AI confirmed: the page is a code page, or it's a link/deal page.
+            result["is_code"] = bool(result["codes"])
+            result["deal_type"] = classify(result["title"], "", result["codes"][0] if result["codes"] else None)
 
             try:
                 links = []

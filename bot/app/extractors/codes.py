@@ -126,6 +126,16 @@ COMMON_WORDS = {
     'SSELECTION','SSAVE','SAVINGS','GOLF','SAVING','TRAVEL','TICKETS',
     'DINING','TRAINING','SHOTUKDEALS','GOLFCREW','EXPEDIATAKE','BUYING',
     'SHOPPING','BOOKING','FLYING','OFFERS','COUPONS','DEALS','PROMOS',
+    'REMOVING','DEPENDING','WORKS','FOLLOW','ONLY','SMOBILE','CODEFOLLOW',
+    'VERIFIED','FEATURED','POPULAR','TRENDING','RECENTLY','CURRENTLY',
+    'RELEASED','EXISTING','APPLYING','ENTERING','USING','SEARCHING',
+    'LOADING','BROWSING','CHECKING','EXPIRING','ENDING','OFFERING',
+    'UNTIL','ALERTS','EXPIRES','REQUEST','MACY','HASN','STRUCTURE',
+    'CODESEE','TIONAL','EXCLUSIVE','SAVING','NOTICE','WARNING','ERROR',
+    'JAVASCRIPT','COOKIES','PRIVACY','SUBSCRIBE','NEWSLETTER','UPDATED',
+    'BECAUSE','DETAILS','ALREADY','ALWAYS','NEVER','MAYBE','OFTEN',
+    'ANOTHER','BETWEEN','THROUGH','DURING','WITHOUT','ABOUT','WHERE',
+    'WHICH','THERE','THEIR','THESE','THOSE','SHOULD','WOULD','COULD',
 }
 
 def validate_code(raw: Optional[str]) -> Optional[str]:
@@ -137,9 +147,19 @@ def validate_code(raw: Optional[str]) -> Optional[str]:
     if cleaned in SKIP_CODES or cleaned in COMMON_WORDS: return None
     if re.match(r'^\d+$', cleaned): return None
     # text fragments sliced out of longer words ("PROMOTIONS" -> "TIONS")
-    if cleaned.endswith(("TION", "TIONS", "MENT", "MENTS", "MENTAL")): return None
+    if any(f in cleaned for f in ("TION", "TIONS", "MENT", "MENTS")): return None
     # class-name slicing artifacts like "SSAVE", "SSELECTION"
     if cleaned.startswith("SS") and len(cleaned) <= 10: return None
+    # nav fragments containing the word itself ("CODESEE", "CODEFOLLOW" labels),
+    # but "CODE2026" or "PROMO20" are legit code formats
+    if len(cleaned) <= 12 and not re.search(r'\d', cleaned) and any(w in cleaned for w in ("CODE", "COUPON", "PROMO")): return None
+    # counter labels like "13COUPONS", "9CODES", "5DEALS" — not codes
+    if re.match(r'^\d{1,4}(?:COUPONS?|CODES?|DEALS?|OFFERS?|SAVINGS?|PROMOS?|DISCOUNTS?)$', cleaned): return None
+    # gerunds / participles from nav copy ("REMOVING", "DEPENDING", "SHOWING")
+    if cleaned.endswith(("ING", "ED", "LY", "LESS")) and len(cleaned) <= 12: return None
+    # long all-letter strings are almost always dictionary words, not codes —
+    # real promo codes mix letters and digits (SAVE20, WELCOME10, FALL25)
+    if cleaned.isalpha() and len(cleaned) >= 9: return None
     return cleaned
 
 def infer_code_from_url(url: str, brand_name: str = "") -> Optional[str]:
